@@ -25,17 +25,22 @@
 				<div class="grid md:grid-cols-2 gap-8">
 					<div>
 						<h3 class="text-lg font-medium text-gray-700 mb-2">Your Board</h3>
-						<Board isOpponent={false} />
+						<Board board={gameState.playerBoard} callback={() => {}} />
 					</div>
 					<div>
 						<h3 class="text-lg font-medium text-gray-700 mb-2">Opponent's Board</h3>
-						<Board isOpponent={true} />
+						<Board
+							board={gameState.opponentBoard}
+							callback={(i, j) => gameState.opponentBoard.set(i, j, 'h')}
+						/>
 					</div>
 				</div>
 
 				<div class="flex justify-center space-x-4">
 					{#if gameState.phase === 'placement'}
-						<button class="btn btn-primary">Rotate Ship</button>
+						<button class="btn btn-primary" onclick={() => gameState.playerBoard.randomize()}
+							>Randomize</button
+						>
 					{:else}
 						<button class="btn btn-primary">Fire!</button>
 					{/if}

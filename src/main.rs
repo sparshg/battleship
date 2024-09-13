@@ -1,4 +1,6 @@
-use axum::{routing::get, Router};
+mod game;
+
+use axum::{routing::get, Json, Router};
 use tokio::net::TcpListener;
 
 #[tokio::main]

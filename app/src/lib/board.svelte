@@ -1,21 +1,27 @@
 <script lang="ts">
-	import Cell from '$lib/cell.svelte';
-	import type { Board } from '$lib/state.svelte';
+	import { Board } from '$lib/state.svelte';
+	import { Crosshair, Ship } from 'lucide-svelte';
 
-	const callback = (i: number, j: number) => {
-		if (!isOpponent) return;
-		console.log(`Cell clicked at row ${i}, column ${j}`);
-		board[i][j] = 'hit';
-	};
-	let board: Board = $state(Array(10).fill(Array(10).fill('empty')));
-
-	let { isOpponent } = $props<{ isOpponent: boolean }>();
+	let { board, callback }: { board: Board; callback: (i: number, j: number) => void } = $props();
 </script>
 
 <div class="grid grid-cols-10 gap-1 bg-blue-100 p-2 rounded-lg">
-	{#each board as row, i}
+	{#each board.board as row, i}
 		{#each row as cell, j}
-			<Cell {cell} {isOpponent} callback={() => callback(i, j)} />
+			<button
+				class="aspect-square bg-blue-200 flex items-center justify-center {!board.isOpponent
+					? 'cursor-default'
+					: ''}"
+				onclick={() => callback(i, j)}
+			>
+				{#if cell === 's'}
+					<Ship class="size-3/5 text-blue-500" />
+				{:else if cell === 'h'}
+					<Crosshair class="size-3/5 text-red-500" />
+				{:else if cell === 'm'}
+					<div class="size-3/5 bg-gray-300 rounded-full"></div>
+				{/if}
+			</button>
 		{/each}
 	{/each}
 </div>
