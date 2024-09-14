@@ -5,6 +5,17 @@ export class State {
     phase: Phase = $state('placement');
     playerBoard = $state(new Board(false));
     opponentBoard = $state(new Board(true));
+    room = $state('');
+
+    createRoom() {
+        this.room = Math.random().toString(36).substring(2, 6).toUpperCase();
+    }
+
+    joinRoom(room: string) {
+        if (room.length != 4) return;
+        if (room == this.room) return;
+        this.room = room;
+    }
 }
 
 export class Board {

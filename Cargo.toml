@@ -1,11 +1,12 @@
 [package]
-name = "todoos"
+name = "battleship"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 axum = "0.7.5"
 dotenv = "0.15.0"
+rand = "0.8.5"
 serde = { version = "1.0.210", features = ["derive"] }
 sqlx = "0.8.2"
 tokio = { version = "1.40.0", features = ["full"] }

@@ -144,6 +144,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
+name = "battleship"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "dotenv",
+ "rand",
+ "serde",
+ "sqlx",
+ "tokio",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1484,17 +1496,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "todoos"
-version = "0.1.0"
-dependencies = [
- "axum",
- "dotenv",
- "serde",
- "sqlx",
- "tokio",
-]
 
 [[package]]
 name = "tokio"
