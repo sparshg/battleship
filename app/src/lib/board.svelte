@@ -19,7 +19,7 @@
 				{:else if cell === 'h'}
 					<Crosshair class="size-3/5 text-red-500" />
 				{:else if cell === 'm'}
-					<div class="size-3/5 bg-gray-300 rounded-full"></div>
+					<div class="size-3/5 bg-blue-400 rounded-full"></div>
 				{/if}
 			</button>
 		{/each}

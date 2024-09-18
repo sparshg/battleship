@@ -1,16 +1,12 @@
 mod game;
-use std::{str::FromStr, sync::Arc};
 
 use axum::Router;
 use dotenv::dotenv;
 use futures_util::stream::StreamExt;
 use game::{add_board, add_room, attack, disconnect, join_room, start, Board, ROOM_CODE_LENGTH};
 use rand::Rng;
-use serde_json::Value;
 use socketioxide::{
-    adapter::Room,
-    extract::{AckSender, Data, SocketRef, State},
-    socket::Sid,
+    extract::{Data, SocketRef, State},
     SocketIo,
 };
 use sqlx::PgPool;
@@ -43,16 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn on_connect(socket: SocketRef, io: SocketIo) {
+fn on_connect(socket: SocketRef) {
     tracing::info!("Connected: {:?}", socket.id);
-    // tracing::info!(
-    //     "All rooms and sockets: {:?}",
-    //     io.rooms()
-    //         .unwrap()
-    //         .iter()
-    //         .map(|room| { (room, io.within(room.clone()).sockets().unwrap()) })
-    // );
-
     socket.on(
         "create",
         |socket: SocketRef, pool: State<PgPool>| async move {
@@ -70,7 +58,11 @@ fn on_connect(socket: SocketRef, io: SocketIo) {
                 .map(|x| char::to_ascii_uppercase(&(x as char)))
                 .collect();
             tracing::info!("Creating room: {:?}", room);
-            add_room(socket.id, room.clone(), &pool).await.unwrap();
+
+            if let Err(e) = add_room(socket.id, room.clone(), &pool).await {
+                tracing::error!("{:?}", e);
+                return;
+            }
             socket.leave_all().unwrap();
             socket.join(room.clone()).unwrap();
             socket.emit("created-room", &room).unwrap();
@@ -84,7 +76,10 @@ fn on_connect(socket: SocketRef, io: SocketIo) {
                 return;
             }
             tracing::info!("Joining room: {:?}", room);
-            join_room(socket.id, room.clone(), &pool).await.unwrap();
+            if let Err(e) = join_room(socket.id, room.clone(), &pool).await {
+                tracing::error!("{:?}", e);
+                return;
+            }
             socket.leave_all().unwrap();
             socket.join(room.clone()).unwrap();
             if socket.within(room.clone()).sockets().unwrap().len() != 2 {
@@ -100,14 +95,21 @@ fn on_connect(socket: SocketRef, io: SocketIo) {
                     async move {
                         match ack {
                             Ok(mut ack) => {
-                                add_board(id, ack.data.pop().unwrap(), &pool).await.unwrap();
+                                if let Err(e) = add_board(id, ack.data.pop().unwrap(), &pool).await
+                                {
+                                    tracing::error!("{:?}", e);
+                                    return;
+                                }
                             }
                             Err(err) => tracing::error!("Ack error, {}", err),
                         }
                     }
                 })
                 .await;
-            start(socket.id, room.clone(), &pool).await.unwrap();
+            if let Err(e) = start(socket.id, room.clone(), &pool).await {
+                tracing::error!("{:?}", e);
+                return;
+            }
             tracing::info!("Game started");
             socket
                 .within(room.clone())
@@ -119,7 +121,13 @@ fn on_connect(socket: SocketRef, io: SocketIo) {
     socket.on(
         "attack",
         |socket: SocketRef, Data::<[usize; 2]>([i, j]), pool: State<PgPool>| async move {
-            let res = attack(socket.id, (i, j), &pool).await.unwrap();
+            let res = match attack(socket.id, (i, j), &pool).await {
+                Ok(res) => res,
+                Err(e) => {
+                    tracing::error!("{:?}", e);
+                    return;
+                }
+            };
             tracing::info!("Attacking at: ({}, {}), result: {}", i, j, res);
             socket
                 .within(socket.rooms().unwrap().first().unwrap().clone())
@@ -134,7 +142,9 @@ fn on_connect(socket: SocketRef, io: SocketIo) {
     socket.on_disconnect(|socket: SocketRef, pool: State<PgPool>| async move {
         tracing::info!("Disconnecting: {:?}", socket.id);
         socket.leave_all().unwrap();
-        disconnect(socket.id, &pool).await.unwrap();
-        // TODO: Delete room
+        if let Err(e) = disconnect(socket.id, &pool).await {
+            tracing::error!("{:?}", e);
+            return;
+        }
     });
 }
