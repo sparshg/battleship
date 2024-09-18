@@ -3,15 +3,25 @@ CREATE TYPE STAT AS ENUM ('waiting', 'p1turn', 'p2turn');
 
 CREATE TABLE IF NOT EXISTS players (
     id CHAR(16) PRIMARY KEY,
-    board CHAR(10) [10],
-    room_code CHAR(4)
+    board CHAR [10] [10],
+    room_code CHAR(4) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS rooms (
     code CHAR(4) PRIMARY KEY,
     player1_id CHAR(16),
     player2_id CHAR(16),
-    stat STAT DEFAULT 'waiting'
+    stat STAT DEFAULT 'waiting' NOT NULL,
+    CHECK (
+        (
+            player1_id IS DISTINCT
+            FROM player2_id
+        )
+        OR (
+            player1_id IS NULL
+            AND player2_id IS NULL
+        )
+    )
 );
 
 ALTER TABLE players
@@ -23,6 +33,23 @@ ADD CONSTRAINT fk_player1 FOREIGN KEY (player1_id) REFERENCES players (id) ON DE
 SET NULL,
     ADD CONSTRAINT fk_player2 FOREIGN KEY (player2_id) REFERENCES players (id) ON DELETE
 SET NULL;
+
+-- delete room if both players are null
+CREATE OR REPLACE FUNCTION delete_room() RETURNS TRIGGER AS $$ BEGIN IF (
+        SELECT player1_id IS NULL
+            AND player2_id IS NULL
+        FROM rooms
+        WHERE code = OLD.room_code
+    ) THEN
+DELETE FROM rooms
+WHERE code = OLD.room_code;
+END IF;
+RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER delete_room_trigger
+AFTER DELETE ON players FOR EACH ROW EXECUTE FUNCTION delete_room();
 
 CREATE INDEX idx_player_room_code ON players (room_code);
 CREATE INDEX idx_room_status ON rooms (stat);

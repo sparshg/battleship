@@ -20,40 +20,29 @@ export class State {
         this.socket.on('upload', (_, callback) => {
             callback(this.playerBoard.board);
         })
-        this.socket.on('turn', (id) => {
-            this.turn = id == this.socket.id;
+        this.socket.on('turnover', (id) => {
+            this.turn = id != this.socket.id;
+        })
+        this.socket.on('attacked', ({ by, at, res }) => {
+            let [i, j] = at;
+            if (by == this.socket.id) {
+                this.opponentBoard.board[i][j] = res ? 'h' : 'm';
+                this.turn = false;
+            } else {
+                this.playerBoard.board[i][j] = res ? 'h' : 'm';
+                this.turn = true;
+            }
         })
     }
 
-    async attack(i: number, j: number) {
+    attack(i: number, j: number) {
         if (!this.turn) return;
         this.turn = false;
-        const res = await this.socket.emitWithAck('attack', [i, j]);
-        if (res) {
-            this.opponentBoard.board[i][j] = 'h';
-        } else {
-            this.opponentBoard.board[i][j] = 'm';
-        }
+        this.socket.emit('attack', [i, j]);
     }
 
-    async createRoom() {
+    createRoom() {
         this.socket.emit('create');
-        // this.socket.emit('upload', this.playerBoard.board);
-        // send the board to the server
-        // let api = 'http://127.0.0.1:3000/';
-        // await fetch(api, {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json',
-        //         'Access-Control-Allow-Origin': '*',
-        //     },
-        //     body: JSON.stringify(this.playerBoard.board),
-        // }).then((response) => {
-        //     console.log(response);
-        //     response.json().then((data) => {
-        //         console.log(data);
-        //     });
-        // });
     }
 
     joinRoom() {
@@ -71,10 +60,6 @@ export class Board {
         this.isOpponent = isOpponent;
         if (!isOpponent) this.randomize();
     }
-
-    // set(x: number, y: number, type: CellType) {
-    //     this.board[x][y] = type;
-    // }
 
     randomize() {
         this.board = Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 'e'));

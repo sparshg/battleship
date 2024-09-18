@@ -1,34 +1,18 @@
-use std::{collections::HashMap, sync::Arc};
-
 use axum::Json;
 use rand::Rng;
 use serde::Deserialize;
 use socketioxide::socket::Sid;
-use tokio::sync::RwLock;
 
 pub const ROOM_CODE_LENGTH: usize = 4;
 
-// #[derive(Default, Clone)]
-// pub struct Store {
-//     rooms: Arc<RwLock<HashMap<String, Room>>>,
-//     sockets: Arc<RwLock<HashMap<Sid, String>>>,
-// }
-
-// impl Store {
-//     pub async fn add_room(&self, code: String) {
-//         let mut store = self.rooms.write().await;
-//         store.insert(
-//             code.clone(),
-//             Room {
-//                 code,
-//                 ..Default::default()
-//             },
-//         );
-//     }
-pub async fn add_room(code: String, pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
-    sqlx::query!("INSERT INTO rooms (code) VALUES ($1)", code)
-        .execute(pool)
-        .await?;
+pub async fn add_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r"WITH new_user AS (INSERT INTO players (id, room_code) VALUES ($1, $2) RETURNING id) INSERT INTO rooms (player1_id, code) SELECT $1, $2 FROM new_user",
+        sid.as_str(),
+        code
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -40,25 +24,39 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
     .fetch_one(pool)
     .await?;
 
+    let sid = sid.as_str();
+
     if room.player1_id.is_some() && room.player2_id.is_some() {
         return Err(sqlx::Error::RowNotFound); // room full
+    }
+    if let Some(id) = room.player1_id.as_ref() {
+        if id == sid {
+            return Err(sqlx::Error::RowNotFound); // already in room
+        }
+    }
+    if let Some(id) = room.player2_id.as_ref() {
+        if id == sid {
+            return Err(sqlx::Error::RowNotFound); // already in room
+        }
     }
 
     let mut txn = pool.begin().await?;
 
+    // create/update player
     sqlx::query!(
         r#"INSERT INTO players (id, room_code) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET room_code = $2"#,
-        sid.as_str(),
+        sid,
         code
     )
     .execute(&mut *txn)
     .await?;
 
+    // add to room
     sqlx::query(&format!(
         "UPDATE rooms SET player{}_id = $1 WHERE code = $2",
         if room.player1_id.is_none() { "1" } else { "2" }
     ))
-    .bind(sid.as_str())
+    .bind(sid)
     .bind(code)
     .execute(&mut *txn)
     .await?;
@@ -66,114 +64,139 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
     txn.commit().await?;
     Ok(())
 }
-//     pub async fn join_room(&self, sid: Sid, code: String) -> Result<(), ()> {
-//         if self.rooms.read().await.get(&code).is_none() {
-//             return Err(());
-//         };
-//         let mut sockets = self.sockets.write().await;
-//         let player = sockets
-//             .entry(sid)
-//             .and_modify(|p| p.room = Some(code.clone()))
-//             .or_insert(Arc::new(Player {
-//                 sid,
-//                 room: Some(code.clone()),
-//                 board: None,
-//             }));
-//         let mut rooms = self.rooms.write().await;
-//         let Some(room) = rooms.get_mut(&code) else {
-//             return Err(());
-//         };
 
-//         if room.player1.is_none() {
-//             room.player1 = Some(Arc::clone(player));
-//         }
-//         Ok(())
-//     }
+pub async fn add_board(sid: Sid, board: Board, pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    let query = format!(
+        "UPDATE players SET board = ARRAY[{}] WHERE id = '{}'",
+        board
+            .0
+            .map(|row| {
+                format!(
+                    "ARRAY[{}]",
+                    row.map(|x| format!("'{x}'"))
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            })
+            .into_iter()
+            .collect::<Vec<String>>()
+            .join(","),
+        sid.as_str()
+    );
+    sqlx::query(&query).execute(pool).await.unwrap();
+    Ok(())
+}
 
-//     pub async fn add_board(&self, sid: Sid, board: Board) -> Result<(), ()> {
-//         let mut store = self.sockets.write().await;
-//         if let Some(player) = store.get_mut(&sid) {
-//             player.board = Some(board);
-//         } else {
-//             return Err(());
-//         }
-//         Ok(())
-//     }
+pub async fn start(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    let room = sqlx::query!(
+        r"SELECT player1_id, player2_id FROM rooms WHERE code = $1",
+        code
+    )
+    .fetch_one(pool)
+    .await?;
 
-//     pub async fn start(&self, code: String, sid: Sid) -> Result<(), ()> {
-//         let mut store = self.rooms.write().await;
-//         let Some(room) = store.get_mut(&code) else {
-//             return Err(());
-//         };
-//         dbg!(&room);
-//         let (Some(player1), Some(player2)) = (room.player1, room.player2) else {
-//             return Err(());
-//         };
+    let (Some(player1), Some(player2)) = (room.player1_id, room.player2_id) else {
+        return Err(sqlx::Error::RowNotFound); // room not full
+    };
 
-//         if player1.sid == sid {
-//             room.status = Status::Player1Turn;
-//         } else if player2.sid == sid {
-//             room.status = Status::Player2Turn;
-//         } else {
-//             return Err(());
-//         }
-//         Ok(())
-//     }
+    let status = if sid.as_str() == player1 {
+        Status::P2Turn
+    } else if sid.as_str() == player2 {
+        Status::P1Turn
+    } else {
+        return Err(sqlx::Error::RowNotFound); // not in room
+    };
 
-//     pub async fn attack(&self, sid: Sid, (i, j): (usize, usize)) -> Result<bool, ()> {
-//         let sockets = self.sockets.read().await;
-//         let Some(player) = sockets.get(&sid) else {
-//             return Err(());
-//         };
-//         let mut rooms = self.rooms.write().await;
-//         let Some(room) = rooms.get_mut(player.room.as_ref().unwrap()) else {
-//             return Err(());
-//         };
+    sqlx::query!(
+        r"UPDATE rooms SET stat = $1 WHERE code = $2",
+        status as Status,
+        code
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
 
-//         match room.status {
-//             Status::Player1Turn if player.sid == room.player1.as_ref().unwrap().sid => {
-//                 room.status = Status::Player2Turn;
-//                 return Ok(room.player2.as_ref().unwrap().board.as_ref().unwrap().0[i][j] == 's');
-//             }
-//             Status::Player2Turn if player.sid == room.player2.as_ref().unwrap().sid => {
-//                 room.status = Status::Player1Turn;
-//                 return Ok(room.player1.as_ref().unwrap().board.as_ref().unwrap().0[i][j] == 's');
-//             }
-//             _ => return Err(()),
-//         }
+pub async fn attack(
+    sid: Sid,
+    (i, j): (usize, usize),
+    pool: &sqlx::PgPool,
+) -> Result<bool, sqlx::Error> {
+    let player = sqlx::query!(r"SELECT room_code FROM players WHERE id = $1", sid.as_str())
+        .fetch_one(pool)
+        .await?;
 
-//         Err(())
-//     }
-// }
+    let room = sqlx::query!(
+        r#"SELECT stat AS "stat: Status", player1_id, player2_id FROM rooms WHERE code = $1"#,
+        player.room_code
+    )
+    .fetch_one(pool)
+    .await?;
 
-// #[derive(Default, Debug)]
-// struct Room {
-//     code: String,
-//     player1: Option<Arc<Player>>,
-//     player2: Option<Arc<Player>>,
-//     status: Status,
-// }
+    let (_, other, to_status) = match (room.player1_id, room.player2_id) {
+        (Some(p1), Some(p2)) if p1 == sid.as_str() && room.stat == Status::P1Turn => {
+            (p1, p2, Status::P2Turn)
+        }
+        (Some(p1), Some(p2)) if p2 == sid.as_str() && room.stat == Status::P2Turn => {
+            (p2, p1, Status::P1Turn)
+        }
+        _ => return Err(sqlx::Error::RowNotFound), // room not full
+    };
 
-// #[derive(Debug)]
-// struct Player {
-//     sid: Sid,
-//     board: Option<Board>,
-//     room: Option<String>,
-// }
+    let mut txn = pool.begin().await?;
 
-#[derive(Debug, sqlx::Type)]
+    let turn = sqlx::query!(
+        r"SELECT board[$1][$2] as HIT FROM players WHERE id = $3",
+        i as i32 + 1,
+        j as i32 + 1,
+        other
+    )
+    .fetch_one(&mut *txn)
+    .await?;
+
+    sqlx::query!(
+        r#"UPDATE players
+        SET board[$1][$2] = CASE
+                WHEN board[$1][$2] = 's' THEN 'h'
+                WHEN board[$1][$2] = 'e' THEN 'm'
+                ELSE board[$1][$2]
+            END
+        WHERE id = $3"#,
+        i as i32 + 1,
+        j as i32 + 1,
+        other
+    )
+    .execute(&mut *txn)
+    .await?;
+
+    sqlx::query!(
+        r#"UPDATE rooms SET stat = $1 WHERE code = $2"#,
+        to_status as Status,
+        player.room_code
+    )
+    .execute(&mut *txn)
+    .await?;
+
+    txn.commit().await?;
+    Ok(turn.hit.unwrap() == "s")
+}
+
+pub async fn disconnect(sid: Sid, pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query!(r"DELETE FROM players WHERE id = $1", sid.as_str())
+        .execute(pool)
+        .await
+        .unwrap();
+    Ok(())
+}
+
+#[derive(Debug, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "STAT", rename_all = "lowercase")]
 enum Status {
     Waiting,
     P1Turn,
     P2Turn,
 }
-
-// impl Default for Status {
-//     fn default() -> Self {
-//         Status::Waiting
-//     }
-// }
 
 #[derive(Debug, Deserialize)]
 pub struct Board(pub [[char; 10]; 10]);
