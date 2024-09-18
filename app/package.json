@@ -35,6 +35,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"lucide-svelte": "^0.441.0"
+		"lucide-svelte": "^0.441.0",
+		"socket.io-client": "^4.7.5"
 	}
 }

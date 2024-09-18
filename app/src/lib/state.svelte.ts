@@ -1,3 +1,5 @@
+import { io, Socket } from "socket.io-client";
+
 export type Phase = 'placement' | 'battle' | 'gameover';
 export type CellType = 'e' | 's' | 'h' | 'm'; // empty, ship, hit, miss
 
@@ -6,15 +8,57 @@ export class State {
     playerBoard = $state(new Board(false));
     opponentBoard = $state(new Board(true));
     room = $state('');
+    turn = $state(false);
+    socket = io('ws://127.0.0.1:3000/', {
+        transports: ['websocket']
+    });
 
-    createRoom() {
-        this.room = Math.random().toString(36).substring(2, 6).toUpperCase();
+    constructor() {
+        this.socket.on('created-room', (room: string) => {
+            this.room = room;
+        });
+        this.socket.on('upload', (_, callback) => {
+            callback(this.playerBoard.board);
+        })
+        this.socket.on('turn', (id) => {
+            this.turn = id == this.socket.id;
+        })
     }
 
-    joinRoom(room: string) {
-        if (room.length != 4) return;
-        if (room == this.room) return;
-        this.room = room;
+    async attack(i: number, j: number) {
+        if (!this.turn) return;
+        this.turn = false;
+        const res = await this.socket.emitWithAck('attack', [i, j]);
+        if (res) {
+            this.opponentBoard.board[i][j] = 'h';
+        } else {
+            this.opponentBoard.board[i][j] = 'm';
+        }
+    }
+
+    async createRoom() {
+        this.socket.emit('create');
+        // this.socket.emit('upload', this.playerBoard.board);
+        // send the board to the server
+        // let api = 'http://127.0.0.1:3000/';
+        // await fetch(api, {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //         'Access-Control-Allow-Origin': '*',
+        //     },
+        //     body: JSON.stringify(this.playerBoard.board),
+        // }).then((response) => {
+        //     console.log(response);
+        //     response.json().then((data) => {
+        //         console.log(data);
+        //     });
+        // });
+    }
+
+    joinRoom() {
+        if (this.room.length != 4) return;
+        this.socket.emit('join', this.room);
     }
 }
 
@@ -28,9 +72,9 @@ export class Board {
         if (!isOpponent) this.randomize();
     }
 
-    set(x: number, y: number, type: CellType) {
-        this.board[x][y] = type;
-    }
+    // set(x: number, y: number, type: CellType) {
+    //     this.board[x][y] = type;
+    // }
 
     randomize() {
         this.board = Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 'e'));

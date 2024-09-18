@@ -5,11 +5,11 @@
 	let { board, callback }: { board: Board; callback: (i: number, j: number) => void } = $props();
 </script>
 
-<div class="grid grid-cols-10 gap-1 bg-blue-200 p-2 rounded-lg">
+<div class="grid grid-cols-10 gap-1 bg-primary p-2 rounded-lg">
 	{#each board.board as row, i}
 		{#each row as cell, j}
 			<button
-				class="aspect-square bg-blue-300 flex items-center justify-center {!board.isOpponent
+				class="aspect-square bg-blue-950 flex items-center justify-center {!board.isOpponent
 					? 'cursor-default'
 					: ''}"
 				onclick={() => callback(i, j)}

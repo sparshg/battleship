@@ -29,10 +29,7 @@
 					</div>
 					<div>
 						<h3 class="text-lg font-medium mb-2">Opponent's Board</h3>
-						<Board
-							board={gameState.opponentBoard}
-							callback={(i, j) => gameState.opponentBoard.set(i, j, 'h')}
-						/>
+						<Board board={gameState.opponentBoard} callback={(i, j) => gameState.attack(i, j)} />
 					</div>
 				</div>
 
@@ -50,9 +47,9 @@
 						type="text"
 						bind:value={gameState.room}
 						placeholder="Code"
-						class="input input-bordered w-full max-w-20"
+						class="input input-bordered w-full max-w-24 text-center"
 					/>
-					<button class="btn btn-outline">Join Room</button>
+					<button class="btn btn-outline" onclick={() => gameState.joinRoom()}>Join Room</button>
 				</div>
 			</div>
 		</main>
