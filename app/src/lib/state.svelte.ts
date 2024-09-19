@@ -25,7 +25,7 @@ export class State {
             callback(this.playerBoard.board);
         });
         this.socket.on('turnover', (id) => {
-            this.turn = id != this.socket.id;
+            this.turn = id == this.socket.id;
             this.phase = this.turn ? 'selfturn' : 'otherturn';
         });
         this.socket.on('attacked', ({ by, at, hit, sunk }) => {

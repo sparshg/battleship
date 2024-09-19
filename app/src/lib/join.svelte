@@ -22,7 +22,9 @@
 	<div class="space-y-4 max-w-[70%]">
 		{#if roomCode}
 			<div class="space-x-2 flex flex-row justify-center items-center">
-				<div class="text-3xl font-bold tracking-widest font-mono bg-accent py-3 rounded-full px-12">
+				<div
+					class="text-3xl font-bold tracking-widest text-accent-content font-mono bg-accent py-3 rounded-full px-12"
+				>
 					{roomCode}
 				</div>
 

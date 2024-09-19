@@ -2,7 +2,15 @@
 	import { Board } from '$lib/state.svelte';
 	import { Crosshair, Ship } from 'lucide-svelte';
 
-	let { board, callback }: { board: Board; callback: (i: number, j: number) => void } = $props();
+	let {
+		class: className,
+		board,
+		callback
+	}: {
+		class: string;
+		board: Board;
+		callback: (i: number, j: number) => void;
+	} = $props();
 </script>
 
 <div class="grid grid-cols-10 ml-4">
@@ -11,7 +19,7 @@
 	{/each}
 </div>
 
-<div class="flex flex-row">
+<div class="{className} flex flex-row">
 	<div class="grid grid-rows-10 items-center mr-1">
 		{#each ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] as i}
 			<div class="text">{i}</div>

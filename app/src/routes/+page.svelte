@@ -16,7 +16,11 @@
 			<div class="p-6 space-y-6">
 				<div class="flex justify-between items-center">
 					<h2 class="text-2xl font-semibold rounded-full bg-base-300 py-3 px-6">
-						{gameState.hasNotStarted() ? 'Place your ships' : 'Battle Phase'}
+						{gameState.hasNotStarted()
+							? 'Place your ships'
+							: gameState.turn
+								? 'Make a guess'
+								: 'Waiting for opponent'}
 					</h2>
 					<div class="flex space-x-4">
 						<div class="text-blue-600">Your Ships: {5}</div>
@@ -27,12 +31,21 @@
 				<div class="grid md:grid-cols-2 gap-8">
 					<div>
 						<h3 class="text-lg font-medium mb-2">Your Board</h3>
-						<Board board={gameState.playerBoard} callback={() => {}} />
+
+						<Board
+							class={!gameState.turn ? 'scale-[1.01]' : 'opacity-60'}
+							board={gameState.playerBoard}
+							callback={() => {}}
+						/>
 					</div>
 					<div>
 						<h3 class="text-lg font-medium mb-2">Opponent's Board</h3>
 						<div class="relative">
-							<Board board={gameState.opponentBoard} callback={(i, j) => gameState.attack(i, j)} />
+							<Board
+								class={gameState.turn ? 'scale-[1.01]' : 'opacity-60'}
+								board={gameState.opponentBoard}
+								callback={(i, j) => gameState.attack(i, j)}
+							/>
 							{#if gameState.hasNotStarted()}
 								<Join
 									class="absolute top-[24px] left-[15px] w-[calc(100%-15px)] h-[calc(100%-24px)]"
