@@ -66,7 +66,7 @@ fn on_connect(socket: SocketRef) {
             }
             socket.leave_all().unwrap();
             socket.join(room.clone()).unwrap();
-            socket.emit("created-room", &room).unwrap();
+            socket.emit("joined-room", &room).unwrap();
         },
     );
 
@@ -83,6 +83,8 @@ fn on_connect(socket: SocketRef) {
             }
             socket.leave_all().unwrap();
             socket.join(room.clone()).unwrap();
+            socket.emit("joined-room", &room).unwrap();
+
             if socket.within(room.clone()).sockets().unwrap().len() != 2 {
                 return;
             }

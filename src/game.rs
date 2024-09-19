@@ -35,6 +35,7 @@ pub async fn add_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()>
 }
 
 pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
+    let code = code.to_uppercase();
     let room = sqlx::query!(
         r#"SELECT player1_id, player2_id FROM rooms WHERE code = $1"#,
         code
@@ -108,9 +109,9 @@ pub async fn start(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
     };
 
     let status = if sid.as_str() == player1 {
-        Status::P2Turn
-    } else if sid.as_str() == player2 {
         Status::P1Turn
+    } else if sid.as_str() == player2 {
+        Status::P2Turn
     } else {
         return Err(Error::NotInRoom); // not in room
     };

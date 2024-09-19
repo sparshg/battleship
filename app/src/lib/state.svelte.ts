@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 
-export type Phase = 'placement' | 'battle' | 'gameover';
+export type Phase = 'placement' | 'waiting' | 'selfturn' | 'otherturn';
 export type CellType = 'e' | 's' | 'h' | 'm'; // empty, ship, hit, miss
 
 export class State {
@@ -16,14 +16,17 @@ export class State {
             transports: ['websocket']
         });
 
-        this.socket.on('created-room', (room: string) => {
+        this.socket.on('joined-room', (room: string) => {
+            this.phase = 'waiting';
             this.room = room;
         });
+
         this.socket.on('upload', (_, callback) => {
             callback(this.playerBoard.board);
         });
         this.socket.on('turnover', (id) => {
             this.turn = id != this.socket.id;
+            this.phase = this.turn ? 'selfturn' : 'otherturn';
         });
         this.socket.on('attacked', ({ by, at, hit, sunk }) => {
             const [i, j]: [number, number] = at;
@@ -33,7 +36,17 @@ export class State {
             } else {
                 this.turn = !hit;
             }
-            board.board[i][j] = hit ? 'h' : 'm';
+            if (hit) {
+                board.board[i][j] = 'h';
+                for (let [x, y] of [[-1, -1], [1, 1], [1, -1], [-1, 1]]) {
+                    const [tx, ty] = [i + x, j + y];
+                    if (tx < 0 || tx >= 10 || ty < 0 || ty >= 10) continue;
+                    if (board.board[tx][ty] == 'e')
+                        board.board[tx][ty] = 'm';
+                }
+            } else {
+                board.board[i][j] = 'm';
+            }
             if (sunk) {
                 const [[minx, miny], [maxx, maxy]] = sunk;
                 const x1 = Math.max(0, minx - 1);
@@ -63,9 +76,14 @@ export class State {
         this.socket.emit('create');
     }
 
-    joinRoom() {
-        if (this.room.length != 4) return;
-        this.socket.emit('join', this.room);
+    joinRoom(code: string) {
+        code = code.toUpperCase();
+        if (code.length != 4 || code == this.room) return;
+        this.socket.emit('join', code);
+    }
+
+    hasNotStarted() {
+        return this.phase == 'placement' || this.phase == 'waiting';
     }
 }
 
