@@ -3,7 +3,7 @@ CREATE TYPE STAT AS ENUM ('waiting', 'p1turn', 'p2turn');
 
 CREATE TABLE IF NOT EXISTS players (
     id CHAR(16) PRIMARY KEY,
-    board CHAR [10] [10],
+    board CHAR(10) [10],
     room_code CHAR(4) NOT NULL
 );
 

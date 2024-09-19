@@ -1,10 +1,7 @@
-use std::convert::Infallible;
-
-use axum::Json;
-use rand::Rng;
-use serde::Deserialize;
 use socketioxide::socket::Sid;
 use thiserror::Error;
+
+use crate::board::Board;
 
 pub const ROOM_CODE_LENGTH: usize = 4;
 
@@ -20,6 +17,8 @@ pub enum Error {
     AlreadyInRoom,
     #[error("Not in room")]
     NotInRoom,
+    #[error("Invalid Move")]
+    InvalidMove,
     #[error("SQL Error\n{0:?}")]
     Sqlx(#[from] sqlx::Error),
 }
@@ -85,25 +84,14 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
 }
 
 pub async fn add_board(sid: Sid, board: Board, pool: &sqlx::PgPool) -> Result<()> {
-    let query = format!(
-        "UPDATE players SET board = ARRAY[{}] WHERE id = '{}'",
-        board
-            .0
-            .map(|row| {
-                format!(
-                    "ARRAY[{}]",
-                    row.map(|x| format!("'{x}'"))
-                        .into_iter()
-                        .collect::<Vec<_>>()
-                        .join(",")
-                )
-            })
-            .into_iter()
-            .collect::<Vec<String>>()
-            .join(","),
+    let board: Vec<String> = board.into();
+    sqlx::query!(
+        "UPDATE players SET board = $1 WHERE id = $2",
+        &board,
         sid.as_str()
-    );
-    sqlx::query(&query).execute(pool).await?;
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -137,7 +125,11 @@ pub async fn start(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
     Ok(())
 }
 
-pub async fn attack(sid: Sid, (i, j): (usize, usize), pool: &sqlx::PgPool) -> Result<bool> {
+pub async fn attack(
+    sid: Sid,
+    (i, j): (usize, usize),
+    pool: &sqlx::PgPool,
+) -> Result<(bool, Option<[(usize, usize); 2]>)> {
     let player = sqlx::query!(r"SELECT room_code FROM players WHERE id = $1", sid.as_str())
         .fetch_one(pool)
         .await?;
@@ -159,42 +151,42 @@ pub async fn attack(sid: Sid, (i, j): (usize, usize), pool: &sqlx::PgPool) -> Re
         _ => return Err(Error::RoomNotFull), // room not full
     };
 
+    let mut board: Board = sqlx::query!(r"SELECT board FROM players WHERE id = $1", other)
+        .fetch_one(pool)
+        .await?
+        .board
+        .unwrap()
+        .into();
+
+    let hit = match board[i][j] {
+        's' => true,
+        'e' => false,
+        _ => return Err(Error::InvalidMove),
+    };
+    board[i][j] = if hit { 'h' } else { 'm' };
+
     let mut txn = pool.begin().await?;
-
-    let turn = sqlx::query!(
-        r"SELECT board[$1][$2] as HIT FROM players WHERE id = $3",
-        i as i32 + 1,
-        j as i32 + 1,
-        other
-    )
-    .fetch_one(&mut *txn)
-    .await?;
-
     sqlx::query!(
-        r#"UPDATE players
-        SET board[$1][$2] = CASE
-                WHEN board[$1][$2] = 's' THEN 'h'
-                WHEN board[$1][$2] = 'e' THEN 'm'
-                ELSE board[$1][$2]
-            END
-        WHERE id = $3"#,
+        r#"UPDATE players SET board[$1] = $2 WHERE id = $3"#,
         i as i32 + 1,
-        j as i32 + 1,
+        board[i].iter().collect::<String>(),
         other
     )
     .execute(&mut *txn)
     .await?;
 
-    sqlx::query!(
-        r#"UPDATE rooms SET stat = $1 WHERE code = $2"#,
-        to_status as Status,
-        player.room_code
-    )
-    .execute(&mut *txn)
-    .await?;
+    if !hit {
+        sqlx::query!(
+            r#"UPDATE rooms SET stat = $1 WHERE code = $2"#,
+            to_status as Status,
+            player.room_code
+        )
+        .execute(&mut *txn)
+        .await?;
+    }
 
     txn.commit().await?;
-    Ok(turn.hit.unwrap() == "s")
+    Ok((hit, if hit { board.has_sunk((i, j)) } else { None }))
 }
 
 pub async fn disconnect(sid: Sid, pool: &sqlx::PgPool) -> Result<()> {
@@ -211,60 +203,3 @@ enum Status {
     P1Turn,
     P2Turn,
 }
-
-#[derive(Debug, Deserialize)]
-pub struct Board(pub [[char; 10]; 10]);
-
-impl Board {
-    const SHIPS: [i32; 5] = [5, 4, 3, 3, 2];
-
-    pub fn from_json(Json(board): Json<Board>) -> Self {
-        board
-    }
-
-    pub fn randomize() -> Self {
-        let mut board = Board([['e'; 10]; 10]);
-        for &length in Self::SHIPS.iter() {
-            loop {
-                let dir = rand::thread_rng().gen_bool(0.5);
-                let x = rand::thread_rng().gen_range(0..(if dir { 10 } else { 11 - length }));
-                let y = rand::thread_rng().gen_range(0..(if dir { 11 - length } else { 10 }));
-                if board.is_overlapping(x, y, length, dir) {
-                    continue;
-                }
-                for i in 0..length {
-                    let (tx, ty) = if dir { (x, y + i) } else { (x + i, y) };
-                    board.0[tx as usize][ty as usize] = 's';
-                }
-                break;
-            }
-        }
-        board
-    }
-
-    fn is_overlapping(&self, x: i32, y: i32, length: i32, dir: bool) -> bool {
-        for i in -1..2 {
-            for j in -1..=length {
-                let (tx, ty) = if dir { (x + i, y + j) } else { (x + j, y + i) };
-                if !(0..10).contains(&tx) || !(0..10).contains(&ty) {
-                    continue;
-                }
-                if self.0[tx as usize][ty as usize] != 'e' {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    // fn validate_syntax(&self) -> bool {
-    //     self.0
-    //         .iter()
-    //         .all(|row| row.iter().all(|cell| matches!(cell, 'e' | 'h' | 'm' | 's')))
-    // }
-}
-
-// pub async fn create_board_route(board: Json<Board>) -> Json<String> {
-//     let board = Board::from_json(board).await;
-//     Json(format!("{:?}", board.0))
-// }

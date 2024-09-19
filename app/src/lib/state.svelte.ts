@@ -9,35 +9,53 @@ export class State {
     opponentBoard = $state(new Board(true));
     room = $state('');
     turn = $state(false);
-    socket = io('ws://127.0.0.1:3000/', {
-        transports: ['websocket']
-    });
+    socket: Socket;
 
-    constructor() {
+    constructor(hostname: string) {
+        this.socket = io(`ws://${hostname}:3000/`, {
+            transports: ['websocket']
+        });
+
         this.socket.on('created-room', (room: string) => {
             this.room = room;
         });
         this.socket.on('upload', (_, callback) => {
             callback(this.playerBoard.board);
-        })
+        });
         this.socket.on('turnover', (id) => {
             this.turn = id != this.socket.id;
-        })
-        this.socket.on('attacked', ({ by, at, res }) => {
-            let [i, j] = at;
+        });
+        this.socket.on('attacked', ({ by, at, hit, sunk }) => {
+            const [i, j]: [number, number] = at;
+            let board = by == this.socket.id ? this.opponentBoard : this.playerBoard;
             if (by == this.socket.id) {
-                this.opponentBoard.board[i][j] = res ? 'h' : 'm';
-                this.turn = false;
+                this.turn = hit;
             } else {
-                this.playerBoard.board[i][j] = res ? 'h' : 'm';
-                this.turn = true;
+                this.turn = !hit;
             }
-        })
+            board.board[i][j] = hit ? 'h' : 'm';
+            if (sunk) {
+                const [[minx, miny], [maxx, maxy]] = sunk;
+                const x1 = Math.max(0, minx - 1);
+                const y1 = Math.max(0, miny - 1);
+                const x2 = Math.min(9, maxx + 1);
+                const y2 = Math.min(9, maxy + 1);
+                for (let x = x1; x <= x2; x++) {
+                    for (let y = y1; y <= y2; y++) {
+                        if (board.board[x][y] == 'e') {
+                            board.board[x][y] = 'm';
+                        }
+                    }
+                }
+            }
+        });
     }
 
     attack(i: number, j: number) {
         if (!this.turn) return;
+        if (this.opponentBoard.board[i][j] != 'e') return;
         this.turn = false;
+
         this.socket.emit('attack', [i, j]);
     }
 

@@ -3,7 +3,8 @@
 	import Header from '$lib/header.svelte';
 	import { State } from '$lib/state.svelte';
 
-	let gameState = new State();
+	const hostname = window.location.hostname;
+	let gameState = new State(hostname);
 </script>
 
 <div class="min-h-screen bg-base-300 py-8 px-4 sm:px-6 lg:px-8">

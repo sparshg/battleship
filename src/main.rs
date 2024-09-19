@@ -1,9 +1,10 @@
+mod board;
 mod game;
-
 use axum::Router;
+use board::Board;
 use dotenv::dotenv;
 use futures_util::stream::StreamExt;
-use game::{add_board, add_room, attack, disconnect, join_room, start, Board, ROOM_CODE_LENGTH};
+use game::{add_board, add_room, attack, disconnect, join_room, start, ROOM_CODE_LENGTH};
 use rand::Rng;
 use socketioxide::{
     extract::{Data, SocketRef, State},
@@ -33,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(layer)
         .layer(CorsLayer::very_permissive());
 
-    let listener = TcpListener::bind("127.0.0.1:3000").await?;
+    let listener = TcpListener::bind("0.0.0.0:3000").await?;
     println!("listening on {}", listener.local_addr()?);
     axum::serve(listener, app).await?;
     Ok(())
@@ -98,7 +99,6 @@ fn on_connect(socket: SocketRef) {
                                 if let Err(e) = add_board(id, ack.data.pop().unwrap(), &pool).await
                                 {
                                     tracing::error!("{:?}", e);
-                                    return;
                                 }
                             }
                             Err(err) => tracing::error!("Ack error, {}", err),
@@ -121,19 +121,19 @@ fn on_connect(socket: SocketRef) {
     socket.on(
         "attack",
         |socket: SocketRef, Data::<[usize; 2]>([i, j]), pool: State<PgPool>| async move {
-            let res = match attack(socket.id, (i, j), &pool).await {
+            let (hit, sunk) = match attack(socket.id, (i, j), &pool).await {
                 Ok(res) => res,
                 Err(e) => {
                     tracing::error!("{:?}", e);
                     return;
                 }
             };
-            tracing::info!("Attacking at: ({}, {}), result: {}", i, j, res);
+            tracing::info!("Attacking at: ({}, {}), result: {:?}", i, j, hit);
             socket
                 .within(socket.rooms().unwrap().first().unwrap().clone())
                 .emit(
                     "attacked",
-                    serde_json::json!({"by": socket.id.as_str(), "at": [i, j], "res": res}),
+                    serde_json::json!({"by": socket.id.as_str(), "at": [i, j], "hit": hit, "sunk": sunk}),
                 )
                 .unwrap();
         },
@@ -144,7 +144,6 @@ fn on_connect(socket: SocketRef) {
         socket.leave_all().unwrap();
         if let Err(e) = disconnect(socket.id, &pool).await {
             tracing::error!("{:?}", e);
-            return;
         }
     });
 }
