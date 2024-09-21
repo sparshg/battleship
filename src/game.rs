@@ -1,3 +1,4 @@
+use serde::Serialize;
 use socketioxide::socket::Sid;
 use thiserror::Error;
 
@@ -9,8 +10,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Room full")]
-    RoomFull,
+    #[error("Room full, potential replacement {0:?}")]
+    RoomFull(Option<String>),
     #[error("Room not full")]
     RoomNotFull,
     #[error("Already in room")]
@@ -23,7 +24,25 @@ pub enum Error {
     Sqlx(#[from] sqlx::Error),
 }
 
+#[derive(Debug, sqlx::Type, PartialEq, Serialize)]
+#[sqlx(type_name = "STAT", rename_all = "lowercase")]
+pub enum Status {
+    Waiting,
+    P1Turn,
+    P2Turn,
+}
+
+pub async fn room_if_player_exists(sid: &str, pool: &sqlx::PgPool) -> Result<Option<String>> {
+    Ok(
+        sqlx::query!("SELECT room_code FROM players WHERE id = $1", sid)
+            .fetch_optional(pool)
+            .await?
+            .map(|player| player.room_code),
+    )
+}
+
 pub async fn add_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
+    delete_sid(sid.as_str(), pool).await?;
     sqlx::query!(
         r"WITH new_user AS (INSERT INTO players (id, room_code) VALUES ($1, $2) RETURNING id) INSERT INTO rooms (player1_id, code) SELECT $1, $2 FROM new_user",
         sid.as_str(),
@@ -45,8 +64,15 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
 
     let sid = sid.as_str();
 
-    if room.player1_id.is_some() && room.player2_id.is_some() {
-        return Err(Error::RoomFull);
+    if let (Some(p1), Some(p2)) = (room.player1_id.as_ref(), room.player2_id.as_ref()) {
+        if in_delete_sid(&p1, &pool).await? {
+            update_sid(&p1, sid, pool).await?;
+            return Err(Error::RoomFull(Some(p1.to_string())));
+        } else if in_delete_sid(&p2, &pool).await? {
+            update_sid(&p2, sid, pool).await?;
+            return Err(Error::RoomFull(Some(p2.to_string())));
+        }
+        return Err(Error::RoomFull(None));
     }
     if let Some(id) = room.player1_id.as_ref() {
         if id == sid {
@@ -58,7 +84,7 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
             return Err(Error::AlreadyInRoom);
         }
     }
-
+    delete_sid(sid, pool).await?;
     let mut txn = pool.begin().await?;
 
     // create/update player
@@ -84,6 +110,15 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
     Ok(())
 }
 
+pub async fn get_room(sid: Sid, pool: &sqlx::PgPool) -> Result<Option<String>> {
+    Ok(
+        sqlx::query!("SELECT room_code FROM players WHERE id = $1", sid.as_str())
+            .fetch_optional(pool)
+            .await?
+            .map(|r| r.room_code),
+    )
+}
+
 pub async fn add_board(sid: Sid, board: Board, pool: &sqlx::PgPool) -> Result<()> {
     let board: Vec<String> = board.into();
     sqlx::query!(
@@ -94,6 +129,66 @@ pub async fn add_board(sid: Sid, board: Board, pool: &sqlx::PgPool) -> Result<()
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn get_game_state(
+    sid: &str,
+    room: &str,
+    pool: &sqlx::PgPool,
+) -> Result<(bool, Vec<String>, Vec<String>)> {
+    let room_details = sqlx::query!(
+        r#"SELECT player1_id, player2_id, stat AS "stat: Status" FROM rooms WHERE code = $1"#,
+        room
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let turn = match room_details.stat {
+        Status::P1Turn if room_details.player1_id == Some(sid.to_string()) => true,
+        Status::P2Turn if room_details.player2_id == Some(sid.to_string()) => true,
+        _ => false,
+    };
+
+    let oid = match (room_details.player1_id, room_details.player2_id) {
+        (Some(p1), Some(p2)) if p1 == sid => p2,
+        (Some(p1), Some(p2)) if p2 == sid => p1,
+        _ => return Err(Error::NotInRoom),
+    };
+
+    let player_board: Board = sqlx::query!(
+        r#"SELECT board FROM players WHERE id = $1 AND room_code = $2"#,
+        sid,
+        room
+    )
+    .fetch_one(pool)
+    .await?
+    .board
+    .unwrap()
+    .into();
+    let player_board: Vec<String> = player_board.mark_redundant().into();
+
+    let opponent_board: Board = sqlx::query!(
+        r#"SELECT board FROM players WHERE id = $1 AND room_code = $2"#,
+        oid,
+        room
+    )
+    .fetch_one(pool)
+    .await?
+    .board
+    .unwrap()
+    .into();
+    let opponent_board: Vec<String> = opponent_board.mark_redundant().into();
+    let opponent_board: Vec<String> = opponent_board
+        .into_iter()
+        .map(|row| {
+            row.chars()
+                .into_iter()
+                .map(|x| if x == 's' { 'e' } else { x })
+                .collect()
+        })
+        .collect::<Vec<_>>();
+
+    Ok((turn, player_board, opponent_board))
 }
 
 pub async fn start(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
@@ -190,17 +285,47 @@ pub async fn attack(
     Ok((hit, if hit { board.has_sunk((i, j)) } else { None }))
 }
 
-pub async fn disconnect(sid: Sid, pool: &sqlx::PgPool) -> Result<()> {
-    sqlx::query!(r"DELETE FROM players WHERE id = $1", sid.as_str())
+pub async fn update_sid(oldsid: &str, newsid: &str, pool: &sqlx::PgPool) -> Result<()> {
+    sqlx::query!(r"UPDATE players SET id = $1 WHERE id = $2", newsid, oldsid)
         .execute(pool)
         .await?;
     Ok(())
 }
 
-#[derive(Debug, sqlx::Type, PartialEq)]
-#[sqlx(type_name = "STAT", rename_all = "lowercase")]
-enum Status {
-    Waiting,
-    P1Turn,
-    P2Turn,
+pub async fn delete_sid(sid: &str, pool: &sqlx::PgPool) -> Result<()> {
+    sqlx::query!(r"DELETE FROM players WHERE id = $1", sid)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn to_delete_sid(sid: &str, pool: &sqlx::PgPool) -> Result<()> {
+    sqlx::query!(
+        r"INSERT INTO abandoned_players (time, id) VALUES (NOW(), $1)",
+        sid
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn in_delete_sid(sid: &str, pool: &sqlx::PgPool) -> Result<bool> {
+    Ok(
+        sqlx::query!(r"SELECT id FROM abandoned_players WHERE id = $1", sid)
+            .fetch_optional(pool)
+            .await?
+            .is_some(),
+    )
+}
+
+pub async fn delete_abandoned(pool: &sqlx::PgPool) -> Result<()> {
+    sqlx::query!(
+        r"DELETE FROM players 
+    WHERE id IN (SELECT id FROM abandoned_players
+    ORDER BY time DESC
+    OFFSET 1000)"
+    )
+    .execute(pool)
+    .await?;
+    Ok(()) // TODO: REMOVE duliplcates id from abandoned
 }

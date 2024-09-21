@@ -3,6 +3,7 @@
 	import Header from '$lib/header.svelte';
 	import Join from '$lib/join.svelte';
 	import { State } from '$lib/state.svelte';
+	import { Users } from 'lucide-svelte';
 
 	const hostname = window.location.hostname;
 	let gameState = new State(hostname);
@@ -18,14 +19,35 @@
 					<h2 class="text-2xl font-semibold rounded-full bg-base-300 py-3 px-6">
 						{gameState.hasNotStarted()
 							? 'Place your ships'
-							: gameState.turn
+							: gameState.turn >= 0
 								? 'Make a guess'
 								: 'Waiting for opponent'}
 					</h2>
-					<div class="flex space-x-4">
-						<div class="text-blue-600">Your Ships: {5}</div>
-						<div class="text-red-600">Enemy Ships: {5}</div>
-					</div>
+					{#if gameState.room}
+						<div class="flex flex-row h-full items-center space-x-4">
+							<button
+								class="rounded-full bg-base-300 px-4 uppercase font-mono font-bold tracking-wide text-xl py-2.5 tooltip tooltip-bottom"
+								data-tip="Copy"
+								onclick={() => navigator.clipboard.writeText(gameState.room)}
+							>
+								{gameState.room}
+							</button>
+							<div class="rounded-full bg-base-300 px-4 flex items-center space-x-2 py-3">
+								<div
+									class="size-3 bg-green-500 rounded-full shadow-[0_0_10px] shadow-green-500"
+								></div>
+								<div class="font-mono font-bold">{gameState.users}</div>
+								<Users />
+							</div>
+							<button
+								class="btn btn-error text-xl"
+								onclick={() => {
+									gameState.socket.emit('leave');
+									gameState = new State(window.location.hostname);
+								}}>Leave</button
+							>
+						</div>
+					{/if}
 				</div>
 
 				<div class="grid md:grid-cols-2 gap-8">
@@ -33,7 +55,7 @@
 						<h3 class="text-lg font-medium mb-2">Your Board</h3>
 
 						<Board
-							class={!gameState.turn ? 'scale-[1.01]' : 'opacity-60'}
+							class={gameState.turn < 0 ? 'scale-[1.01]' : 'opacity-60'}
 							board={gameState.playerBoard}
 							callback={() => {}}
 						/>
@@ -42,7 +64,7 @@
 						<h3 class="text-lg font-medium mb-2">Opponent's Board</h3>
 						<div class="relative">
 							<Board
-								class={gameState.turn ? 'scale-[1.01]' : 'opacity-60'}
+								class={gameState.turn >= 0 ? 'scale-[1.01]' : 'opacity-60'}
 								board={gameState.opponentBoard}
 								callback={(i, j) => gameState.attack(i, j)}
 							/>

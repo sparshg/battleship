@@ -23,13 +23,13 @@
 		{#if roomCode}
 			<div class="space-x-2 flex flex-row justify-center items-center">
 				<div
-					class="text-3xl font-bold tracking-widest text-accent-content font-mono bg-accent py-3 rounded-full px-12"
+					class="text-3xl font-bold tracking-widest text-secondary-content font-mono bg-secondary py-3 rounded-full px-12"
 				>
 					{roomCode}
 				</div>
 
 				<button
-					class="btn btn-accent btn-circle size-16"
+					class="btn btn-secondary btn-circle size-16"
 					onclick={() => navigator.clipboard.writeText(roomCode)}
 				>
 					<ClipboardCopy />
@@ -51,7 +51,7 @@
 			/>
 			<button
 				onclick={() => joinRoom(joinCode)}
-				class="w-full btn btn-outline btn-neutral text-neutral hover:text-neutral hover:bg-transparent text-xl"
+				class="w-full btn btn-outline btn-neutral text-neutral hover:border-neutral hover:bg-transparent text-xl"
 			>
 				Join Room
 			</button>

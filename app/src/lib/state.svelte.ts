@@ -7,34 +7,43 @@ export class State {
     phase: Phase = $state('placement');
     playerBoard = $state(new Board(false));
     opponentBoard = $state(new Board(true));
+    users = $state(0);
     room = $state('');
-    turn = $state(false);
+    turn = $state(-1); // -1 not my turn, 0 might be, 1 is
     socket: Socket;
 
     constructor(hostname: string) {
+        let session = sessionStorage.getItem('session');
+
         this.socket = io(`ws://${hostname}:3000/`, {
-            transports: ['websocket']
+            transports: ['websocket'],
+            auth: { session }
         });
 
-        this.socket.on('joined-room', (room: string) => {
-            this.phase = 'waiting';
+        this.socket.on('connect', () => {
+            sessionStorage.setItem('session', this.socket.id!);
+        });
+
+        this.socket.on('update-room', ({ room, users }) => {
+            if (this.phase == 'placement') this.phase = 'waiting';
             this.room = room;
+            this.users = users;
         });
 
         this.socket.on('upload', (_, callback) => {
             callback(this.playerBoard.board);
         });
         this.socket.on('turnover', (id) => {
-            this.turn = id == this.socket.id;
+            this.turn = (id == this.socket.id) ? 1 : -1;
             this.phase = this.turn ? 'selfturn' : 'otherturn';
         });
         this.socket.on('attacked', ({ by, at, hit, sunk }) => {
             const [i, j]: [number, number] = at;
             let board = by == this.socket.id ? this.opponentBoard : this.playerBoard;
             if (by == this.socket.id) {
-                this.turn = hit;
+                this.turn = (hit) ? 1 : -1;
             } else {
-                this.turn = !hit;
+                this.turn = (!hit) ? 1 : -1;
             }
             if (hit) {
                 board.board[i][j] = 'h';
@@ -62,12 +71,19 @@ export class State {
                 }
             }
         });
+
+        this.socket.on('restore', ({ turn, player, opponent }: { turn: boolean, player: string[], opponent: string[] }) => {
+            this.turn = turn ? 1 : -1;
+            this.phase = this.turn ? 'selfturn' : 'otherturn';
+            this.playerBoard.board = player.map((s) => s.split('').map(c => c as CellType));
+            this.opponentBoard.board = opponent.map((s) => s.split('').map(c => c as CellType));
+        })
     }
 
     attack(i: number, j: number) {
-        if (!this.turn) return;
+        if (this.turn != 1) return;
         if (this.opponentBoard.board[i][j] != 'e') return;
-        this.turn = false;
+        this.turn = 0;
 
         this.socket.emit('attack', [i, j]);
     }
@@ -86,6 +102,7 @@ export class State {
         return this.phase == 'placement' || this.phase == 'waiting';
     }
 }
+
 
 export class Board {
     static shipTypes = [5, 4, 3, 3, 2];

@@ -2,9 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 use axum::Json;
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Board(pub [[char; 10]; 10]);
 
 impl From<Board> for Vec<String> {
@@ -107,6 +107,31 @@ impl Board {
             }
         }
         Some(bounds)
+    }
+
+    pub fn mark_redundant(mut self) -> Self {
+        for i in 0..10 {
+            for j in 0..10 {
+                if self[i][j] == 'h' {
+                    for (dx, dy) in [(-1, -1), (1, 1), (1, -1), (-1, 1)].iter() {
+                        let (tx, ty) = ((i as i32 + dx) as usize, (j as i32 + dy) as usize);
+                        if (0..10).contains(&tx) && (0..10).contains(&ty) {
+                            self[tx][ty] = 'm';
+                        }
+                    }
+                    if self.has_sunk((i, j)).is_some() {
+                        for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)].iter() {
+                            let (tx, ty) = ((i as i32 + dx) as usize, (j as i32 + dy) as usize);
+                            if (0..10).contains(&tx) && (0..10).contains(&ty) && self[tx][ty] == 'e'
+                            {
+                                self[tx][ty] = 'm';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self
     }
 
     // fn validate_syntax(&self) -> bool {
