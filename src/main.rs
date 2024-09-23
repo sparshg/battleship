@@ -23,7 +23,7 @@ use tracing_subscriber::FmtSubscriber;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(
         FmtSubscriber::builder()
-            .with_max_level(tracing::Level::INFO)
+            .with_max_level(tracing::Level::ERROR)
             .finish(),
     )?;
     let _ = dotenv();
