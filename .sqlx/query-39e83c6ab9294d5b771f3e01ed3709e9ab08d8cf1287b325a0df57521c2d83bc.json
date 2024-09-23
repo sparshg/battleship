@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE rooms SET stat = $1 WHERE code = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "stat",
+            "kind": {
+              "Enum": [
+                "waiting",
+                "p1turn",
+                "p2turn"
+              ]
+            }
+          }
+        },
+        "Bpchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "39e83c6ab9294d5b771f3e01ed3709e9ab08d8cf1287b325a0df57521c2d83bc"
+}

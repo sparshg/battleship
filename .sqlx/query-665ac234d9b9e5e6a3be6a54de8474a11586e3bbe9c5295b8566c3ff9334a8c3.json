@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE players SET board = $1 WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "BpcharArray",
+        "Bpchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "665ac234d9b9e5e6a3be6a54de8474a11586e3bbe9c5295b8566c3ff9334a8c3"
+}

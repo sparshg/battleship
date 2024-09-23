@@ -64,7 +64,7 @@ async fn generate_code(pool: &sqlx::PgPool) -> Result<String> {
 
 pub async fn add_room(sid: Sid, pool: &sqlx::PgPool) -> Result<String> {
     delete_sid(sid.as_str(), pool).await?;
-    let code = generate_code(&pool).await?;
+    let code = generate_code(pool).await?;
 
     sqlx::query!(
         r"WITH new_user AS (INSERT INTO players (id, room_code) VALUES ($1, $2) RETURNING id) INSERT INTO rooms (player1_id, code) SELECT $1, $2 FROM new_user",
@@ -88,11 +88,11 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
     let sid = sid.as_str();
 
     if let (Some(p1), Some(p2)) = (room.player1_id.as_ref(), room.player2_id.as_ref()) {
-        if in_delete_sid(&p1, &pool).await? {
-            update_sid(&p1, sid, pool).await?;
+        if in_delete_sid(p1, pool).await? {
+            update_sid(p1, sid, pool).await?;
             return Err(Error::RoomFull(Some(p1.to_string())));
-        } else if in_delete_sid(&p2, &pool).await? {
-            update_sid(&p2, sid, pool).await?;
+        } else if in_delete_sid(p2, pool).await? {
+            update_sid(p2, sid, pool).await?;
             return Err(Error::RoomFull(Some(p2.to_string())));
         }
         return Err(Error::RoomFull(None));
@@ -205,7 +205,6 @@ pub async fn get_game_state(
         .into_iter()
         .map(|row| {
             row.chars()
-                .into_iter()
                 .map(|x| if x == 's' { 'e' } else { x })
                 .collect()
         })

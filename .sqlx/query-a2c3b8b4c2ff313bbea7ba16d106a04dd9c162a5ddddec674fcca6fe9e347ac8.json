@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT board FROM players WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "board",
+        "type_info": "BpcharArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bpchar"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "a2c3b8b4c2ff313bbea7ba16d106a04dd9c162a5ddddec674fcca6fe9e347ac8"
+}

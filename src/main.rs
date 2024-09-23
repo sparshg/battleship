@@ -8,7 +8,6 @@ use game::{
     add_board, add_room, attack, delete_sid, get_game_state, get_room, join_room,
     room_if_player_exists, start, to_delete_sid, update_sid, Error, ROOM_CODE_LENGTH,
 };
-use rand::Rng;
 
 use serde::Deserialize;
 use socketioxide::{
@@ -58,8 +57,8 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
     if let Some(sid) = auth.session {
         update_sid(&sid, socket.id.as_str(), &pool).await.unwrap();
         let sid = socket.id.as_str();
-        if let Some(room) = room_if_player_exists(&sid, &pool).await.unwrap() {
-            let data = get_game_state(&sid, &room, &pool).await.unwrap();
+        if let Some(room) = room_if_player_exists(sid, &pool).await.unwrap() {
+            let data = get_game_state(sid, &room, &pool).await.unwrap();
             socket
                 .emit(
                     "restore",
@@ -116,7 +115,7 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
             if let Err(e) = &room_error {
                 if let Error::RoomFull(Some(player)) = &e {
                     tracing::warn!("{:?}", e);
-                    update_sid(&player, socket.id.as_str(), &pool).await.unwrap();
+                    update_sid(player, socket.id.as_str(), &pool).await.unwrap();
                     let data = get_game_state(socket.id.as_str(), &room, &pool).await.unwrap();
                     socket
                         .emit(
@@ -220,9 +219,9 @@ async fn leave_and_inform(socket: &SocketRef, pool: &PgPool, delete: bool) {
     emit_update_room(socket, &room.to_string(), ops.sockets().unwrap().len());
     let sid = socket.id.as_str();
     if let Err(e) = if delete {
-        delete_sid(sid, &pool).await
+        delete_sid(sid, pool).await
     } else {
-        to_delete_sid(sid, &pool).await
+        to_delete_sid(sid, pool).await
     } {
         tracing::error!("{:?}", e);
     }

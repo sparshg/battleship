@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT player1_id, player2_id, stat AS \"stat: Status\" FROM rooms WHERE code = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "player1_id",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "player2_id",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "stat: Status",
+        "type_info": {
+          "Custom": {
+            "name": "stat",
+            "kind": {
+              "Enum": [
+                "waiting",
+                "p1turn",
+                "p2turn"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bpchar"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "6108a32cad01040d876e139b882da3d6a28c448b5a0ad12a67d8e77c64e7c230"
+}
