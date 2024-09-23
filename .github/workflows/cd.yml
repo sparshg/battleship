@@ -1,15 +1,13 @@
 name: Deploy
 
 on:
-  workflow_run:
-    workflows: ["Check"]
-    types:
-      - completed
+  push:
+    tags:
+      - v**
   workflow_dispatch:
       
 jobs:
   docker:
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ubuntu-latest
     environment: battleship
     steps:
