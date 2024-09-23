@@ -12,15 +12,16 @@ export class State {
     turn = $state(-1); // -1 not my turn, 0 might be, 1 is
     socket: Socket;
 
-    constructor(hostname: string) {
-        let session = sessionStorage.getItem('session');
+    constructor(hostname: string, newSession: boolean = true) {
+        // let session = sessionStorage.getItem('session');
 
         this.socket = io(`ws://${hostname}:3000/`, {
             transports: ['websocket'],
-            auth: { session }
+            auth: { session: !newSession ? sessionStorage.getItem('session') : null }
         });
 
         this.socket.on('connect', () => {
+            console.log(this.socket.id);
             sessionStorage.setItem('session', this.socket.id!);
         });
 

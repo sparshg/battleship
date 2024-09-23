@@ -32,10 +32,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = sqlx::postgres::PgPool::connect(&url).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
     sqlx::query("DELETE FROM players").execute(&pool).await?;
-    sqlx::query("DELETE FROM abandoned_players")
-        .execute(&pool)
-        .await?;
-    sqlx::query("DELETE FROM rooms").execute(&pool).await?;
     let (layer, io) = SocketIo::builder().with_state(pool).build_layer();
 
     io.ns("/", on_connect);
@@ -90,18 +86,15 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
                 return;
             }
 
-            let room: String = rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
-                .take(ROOM_CODE_LENGTH)
-                .map(|x| char::to_ascii_uppercase(&(x as char)))
-                .collect();
-            tracing::info!("Creating room: {:?}", room);
-            // TODO: Handle duplicates
+            let room = match add_room(socket.id, &pool).await {
+                Err(e) => {
+                    tracing::error!("{:?}", e);
+                    return;
+                }
+                Ok(c) => c,
+            };
 
-            if let Err(e) = add_room(socket.id, room.clone(), &pool).await {
-                tracing::error!("{:?}", e);
-                return;
-            }
+            tracing::info!("Creating room: {:?}", room);
             socket.leave_all().unwrap();
             socket.join(room.clone()).unwrap();
             emit_update_room(
@@ -119,7 +112,7 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
                 return;
             }
             tracing::info!("Joining room: {:?}", room);
-            let room_error = join_room(socket.id, room.clone(), &pool).await; 
+            let room_error = join_room(socket.id, room.clone(), &pool).await;
             if let Err(e) = &room_error {
                 if let Error::RoomFull(Some(player)) = &e {
                     tracing::warn!("{:?}", e);
@@ -202,17 +195,17 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
         "leave",
         |socket: SocketRef, pool: State<PgPool>| async move {
             tracing::info!("Leaving Rooms: {:?}", socket.id);
-            leave_and_inform(&socket, &pool).await;
+            leave_and_inform(&socket, &pool, true).await;
         },
     );
 
     socket.on_disconnect(|socket: SocketRef, pool: State<PgPool>| async move {
         tracing::info!("Disconnecting: {:?}", socket.id);
-        leave_and_inform(&socket, &pool).await;
+        leave_and_inform(&socket, &pool, false).await;
     });
 }
 
-async fn leave_and_inform(socket: &SocketRef, pool: &PgPool) {
+async fn leave_and_inform(socket: &SocketRef, pool: &PgPool, delete: bool) {
     let room = socket
         .rooms()
         .unwrap()
@@ -225,7 +218,12 @@ async fn leave_and_inform(socket: &SocketRef, pool: &PgPool) {
     let ops = socket.within(room.clone());
     socket.leave_all().unwrap();
     emit_update_room(socket, &room.to_string(), ops.sockets().unwrap().len());
-    if let Err(e) = to_delete_sid(socket.id.as_str(), pool).await {
+    let sid = socket.id.as_str();
+    if let Err(e) = if delete {
+        delete_sid(sid, &pool).await
+    } else {
+        to_delete_sid(sid, &pool).await
+    } {
         tracing::error!("{:?}", e);
     }
 }

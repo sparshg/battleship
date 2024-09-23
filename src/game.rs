@@ -1,3 +1,4 @@
+use rand::Rng;
 use serde::Serialize;
 use socketioxide::socket::Sid;
 use thiserror::Error;
@@ -20,6 +21,8 @@ pub enum Error {
     NotInRoom,
     #[error("Invalid Move")]
     InvalidMove,
+    #[error("Code Generation Limit Reached")]
+    CodeGenerationLimitReached,
     #[error("SQL Error\n{0:?}")]
     Sqlx(#[from] sqlx::Error),
 }
@@ -41,8 +44,28 @@ pub async fn room_if_player_exists(sid: &str, pool: &sqlx::PgPool) -> Result<Opt
     )
 }
 
-pub async fn add_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
+async fn generate_code(pool: &sqlx::PgPool) -> Result<String> {
+    for _ in 0..50 {
+        let code: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(ROOM_CODE_LENGTH)
+            .map(|x| char::to_ascii_uppercase(&(x as char)))
+            .collect();
+        if sqlx::query!(r"SELECT code FROM rooms WHERE code = $1", code)
+            .fetch_optional(pool)
+            .await?
+            .is_none()
+        {
+            return Ok(code);
+        }
+    }
+    Err(Error::CodeGenerationLimitReached)
+}
+
+pub async fn add_room(sid: Sid, pool: &sqlx::PgPool) -> Result<String> {
     delete_sid(sid.as_str(), pool).await?;
+    let code = generate_code(&pool).await?;
+
     sqlx::query!(
         r"WITH new_user AS (INSERT INTO players (id, room_code) VALUES ($1, $2) RETURNING id) INSERT INTO rooms (player1_id, code) SELECT $1, $2 FROM new_user",
         sid.as_str(),
@@ -50,7 +73,7 @@ pub async fn add_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()>
     )
     .execute(pool)
     .await?;
-    Ok(())
+    Ok(code)
 }
 
 pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
@@ -286,9 +309,13 @@ pub async fn attack(
 }
 
 pub async fn update_sid(oldsid: &str, newsid: &str, pool: &sqlx::PgPool) -> Result<()> {
-    sqlx::query!(r"UPDATE players SET id = $1 WHERE id = $2", newsid, oldsid)
-        .execute(pool)
-        .await?;
+    sqlx::query!(
+        r"UPDATE players SET id = $1, abandoned = FALSE WHERE id = $2",
+        newsid,
+        oldsid
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -300,32 +327,17 @@ pub async fn delete_sid(sid: &str, pool: &sqlx::PgPool) -> Result<()> {
 }
 
 pub async fn to_delete_sid(sid: &str, pool: &sqlx::PgPool) -> Result<()> {
-    sqlx::query!(
-        r"INSERT INTO abandoned_players (time, id) VALUES (NOW(), $1)",
-        sid
-    )
-    .execute(pool)
-    .await?;
+    sqlx::query!(r"UPDATE players SET abandoned = TRUE WHERE id = $1", sid)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
 pub async fn in_delete_sid(sid: &str, pool: &sqlx::PgPool) -> Result<bool> {
     Ok(
-        sqlx::query!(r"SELECT id FROM abandoned_players WHERE id = $1", sid)
-            .fetch_optional(pool)
+        sqlx::query!(r"SELECT abandoned FROM players WHERE id = $1", sid)
+            .fetch_one(pool)
             .await?
-            .is_some(),
+            .abandoned,
     )
-}
-
-pub async fn delete_abandoned(pool: &sqlx::PgPool) -> Result<()> {
-    sqlx::query!(
-        r"DELETE FROM players 
-    WHERE id IN (SELECT id FROM abandoned_players
-    ORDER BY time DESC
-    OFFSET 1000)"
-    )
-    .execute(pool)
-    .await?;
-    Ok(()) // TODO: REMOVE duliplcates id from abandoned
 }
