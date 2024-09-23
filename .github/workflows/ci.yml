@@ -11,10 +11,11 @@ env:
   SQLX_OFFLINE: true
 
 jobs:
-  check-lint:
+  build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
     - name: Check
       run: cargo check
     - name: Clippy
