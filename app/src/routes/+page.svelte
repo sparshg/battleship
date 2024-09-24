@@ -43,7 +43,7 @@
 								class="btn btn-error text-xl"
 								onclick={() => {
 									gameState.socket.emit('leave');
-									gameState = new State(window.location.hostname, true);
+									gameState = new State(window.location.hostname);
 								}}>Leave</button
 							>
 						</div>
