@@ -16,11 +16,14 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: 'app/package-lock.json'
 
       - name: Install dependencies
+        working-directory: app
         run: npm install
-
+        
       - name: build
+        working-directory: app
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: npm run build
@@ -29,7 +32,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # this should match the `pages` option in your adapter-static options
-          path: 'build/'
+          path: 'app/build/'
 
   deploy-site:
     needs: build_site
