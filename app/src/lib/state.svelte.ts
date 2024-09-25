@@ -38,7 +38,7 @@ export class State {
         });
         this.socket.on('attacked', ({ by, at, hit, sunk }) => {
             const [i, j]: [number, number] = at;
-            let board = by == this.socket.id ? this.opponentBoard : this.playerBoard;
+            const board = by == this.socket.id ? this.opponentBoard : this.playerBoard;
             if (by == this.socket.id) {
                 this.turn = (hit) ? 1 : -1;
             } else {
@@ -46,7 +46,7 @@ export class State {
             }
             if (hit) {
                 board.board[i][j] = 'h';
-                for (let [x, y] of [[-1, -1], [1, 1], [1, -1], [-1, 1]]) {
+                for (const [x, y] of [[-1, -1], [1, 1], [1, -1], [-1, 1]]) {
                     const [tx, ty] = [i + x, j + y];
                     if (tx < 0 || tx >= 10 || ty < 0 || ty >= 10) continue;
                     if (board.board[tx][ty] == 'e')
@@ -132,7 +132,7 @@ export class Board {
     isOverlapping(x: number, y: number, length: number, dir: number): boolean {
         for (let i = -1; i < 2; i++) {
             for (let j = -1; j < length + 1; j++) {
-                let [tx, ty] = [x + (dir ? i : j), y + (dir ? j : i)];
+                const [tx, ty] = [x + (dir ? i : j), y + (dir ? j : i)];
                 if (tx < 0 || tx >= 10 || ty < 0 || ty >= 10) continue;
                 if (this.board[tx][ty] != 'e') return true;
             }

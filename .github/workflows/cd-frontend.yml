@@ -2,8 +2,10 @@ name: Deploy
 
 on:
   push:
-    branches: [ "main" ]
-      
+    tags:
+      - v**
+  workflow_dispatch:
+
 jobs:
   build_site:
     runs-on: ubuntu-latest

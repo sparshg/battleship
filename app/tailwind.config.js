@@ -5,7 +5,7 @@ export default {
     extend: {},
   },
   plugins: [
-    require('daisyui'),
+    require('daisyui'), // eslint-disable-line
   ],
 
   daisyui: {
