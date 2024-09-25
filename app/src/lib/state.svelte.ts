@@ -13,7 +13,8 @@ export class State {
     socket: Socket;
 
     constructor() {
-        this.socket = io(`wss://battleship.icyground-d91964e0.centralindia.azurecontainerapps.io`, {
+        const url = import.meta.env.DEV ? 'ws://localhost:3000' : 'wss://battleship.icyground-d91964e0.centralindia.azurecontainerapps.io';
+        this.socket = io(url, {
             transports: ['websocket'],
             auth: { session: sessionStorage.getItem('session') }
         });
