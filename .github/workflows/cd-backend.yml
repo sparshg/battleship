@@ -25,6 +25,29 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: ${{ secrets.DOCKER_IMAGE_PATH }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ secrets.DOCKER_IMAGE_PATH }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKER_IMAGE_PATH }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_IMAGE_PATH }}:buildcache,mode=max
+  azure:
+    runs-on: ubuntu-latest
+    environment: battleship
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - 
+        name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - 
+        name: Deploy Container
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          registryUrl: docker.io
+          containerAppName: battleship
+          resourceGroup: Battleship
+          imageToDeploy: docker.io/${{ secrets.DOCKER_IMAGE_PATH }}:${{ github.sha }}
+
