@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy backend
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
       
 jobs:
-  docker:
+  docker-azure:
     runs-on: ubuntu-latest
     environment: battleship
     permissions:

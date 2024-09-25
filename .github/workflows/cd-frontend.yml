@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy frontend
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_site:
+  build_frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,8 +36,8 @@ jobs:
           # this should match the `pages` option in your adapter-static options
           path: 'app/build/'
 
-  deploy-site:
-    needs: build_site
+  deploy-frontend:
+    needs: build_frontend
     runs-on: ubuntu-latest
 
     permissions:
