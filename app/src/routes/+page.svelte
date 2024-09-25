@@ -5,8 +5,7 @@
 	import { State } from '$lib/state.svelte';
 	import { Users } from 'lucide-svelte';
 
-	const hostname = window.location.hostname;
-	let gameState = new State(hostname);
+	let gameState = new State();
 </script>
 
 <div class="min-h-screen bg-base-300 py-8 px-4 sm:px-6 lg:px-8">
@@ -43,7 +42,7 @@
 								class="btn btn-error text-xl"
 								onclick={() => {
 									gameState.socket.emit('leave');
-									gameState = new State(window.location.hostname);
+									gameState = new State();
 								}}>Leave</button
 							>
 						</div>

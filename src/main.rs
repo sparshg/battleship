@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .finish(),
     )?;
     let _ = dotenv();
-    let url = std::env::var("DATABASE_URL")?;
+    let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = sqlx::postgres::PgPool::connect(&url).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
     sqlx::query("DELETE FROM players").execute(&pool).await?;
@@ -35,7 +35,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     io.ns("/", on_connect);
     let app = Router::new()
-        // .route("/", post(game::create_board_route))
         .layer(layer)
         .layer(CorsLayer::very_permissive());
 
