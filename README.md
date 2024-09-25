@@ -2,8 +2,9 @@
 
 Play the classic game of Battleship against your friends online! Each player will take turns guessing the location of the other player's ships. The first player to sink all of the other player's ships wins!
 
-![Screenshot](demo/1.png)
-![Screenshot](demo/2.png)
+Dark mode             |  Light mode
+:-------------------------:|:-------------------------:
+![](demo/1.png)  |  ![](demo/2.png)
 
 ## Development Guide
 
