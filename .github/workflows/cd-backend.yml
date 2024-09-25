@@ -31,8 +31,10 @@ jobs:
       -
         name: Login to Azure
         uses: azure/login@v1
+        env:
+          CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: $CREDENTIALS
       - 
         name: Deploy Container
         uses: azure/container-apps-deploy-action@v1
