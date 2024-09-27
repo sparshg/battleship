@@ -21,6 +21,7 @@
 >
 	<div class="space-y-4 max-w-[70%]">
 		{#if roomCode}
+		<div class="text-center text-lg text-primary-content">Share this code with your opponent to play</div>
 			<div class="space-x-2 flex flex-row justify-center items-center">
 				<div
 					class="text-3xl font-bold tracking-widest text-secondary-content font-mono bg-secondary py-3 rounded-full px-12"
@@ -40,21 +41,23 @@
 				Create Room
 			</button>
 		{/if}
-		<div class="text-center text-lg text-primary-content">OR</div>
-		<div class="space-y-2">
-			<input
-				type="text"
-				placeholder="Enter code"
-				maxlength="4"
-				bind:value={joinCode}
-				class="input input-bordered input-primary uppercase tracking-widest placeholder-primary text-neutral text-center font-bold text-xl lg:text-3xl w-full glass"
-			/>
-			<button
-				onclick={() => joinRoom(joinCode)}
-				class="w-full btn btn-outline btn-neutral text-neutral hover:border-neutral hover:bg-transparent text-xl"
-			>
-				Join Room
-			</button>
-		</div>
+		{#if !roomCode}
+			<div class="text-center text-lg text-primary-content">OR</div>
+			<div class="space-y-2">
+				<input
+					type="text"
+					placeholder="Enter code"
+					maxlength="4"
+					bind:value={joinCode}
+					class="input input-bordered input-primary uppercase tracking-widest placeholder-primary text-neutral text-center font-bold text-xl lg:text-3xl w-full glass"
+				/>
+				<button
+					onclick={() => joinRoom(joinCode)}
+					class="w-full btn btn-outline btn-neutral text-neutral hover:border-neutral hover:bg-transparent text-xl"
+				>
+					Join Room
+				</button>
+			</div>
+		{/if}
 	</div>
 </div>
