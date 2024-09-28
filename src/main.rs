@@ -19,6 +19,7 @@ use socketioxide::{
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tracing::warn;
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
@@ -37,7 +38,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     io.ns("/", on_connect);
     // Get the allowed origins from the .env file
-    let allowed_origins = env::var("ALLOWED_ORIGINS").expect("ALLOWED_ORIGINS must be set");
+    let allowed_origins = env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| {
+        warn!("ALLOWED_ORIGINS not found in .env, defaulting to http://localhost:5173");
+        "http://localhost:5173".to_string()
+    });
 
     // Split the origins by comma and collect them into a vector
     let origins: Vec<String> = allowed_origins
@@ -49,12 +53,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let allow_origin = AllowOrigin::list(origins.iter().map(|origin| origin.parse().unwrap()));
 
     // Create a CORS layer
-    let cors = CorsLayer::new().allow_origin(allow_origin).allow_methods([
-        Method::GET,
-        Method::POST,
-        Method::PUT,
-        Method::DELETE,
-    ]);
+    let cors = CorsLayer::new()
+        .allow_origin(allow_origin)
+        .allow_methods([Method::GET, Method::POST]);
 
     let app = Router::new().layer(layer).layer(cors);
 
