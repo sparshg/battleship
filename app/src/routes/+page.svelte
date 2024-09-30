@@ -6,6 +6,11 @@
 	import { Users } from 'lucide-svelte';
 
 	let gameState = new State();
+
+	function leaveRoom() {
+		gameState.socket.emit('leave');
+		gameState = new State();
+	}
 </script>
 
 <div class="min-h-screen bg-base-300 py-8 px-4 sm:px-6 lg:px-8">
@@ -40,10 +45,7 @@
 							</div>
 							<button
 								class="btn btn-error text-xl"
-								onclick={() => {
-									gameState.socket.emit('leave');
-									gameState = new State();
-								}}>Leave</button
+								onclick={leaveRoom}>Leave</button
 							>
 						</div>
 					{/if}
@@ -73,6 +75,7 @@
 									roomCode={gameState.room}
 									createRoom={() => gameState.createRoom()}
 									joinRoom={(code) => gameState.joinRoom(code)}
+									leaveRoom={leaveRoom}
 								/>
 							{/if}
 						</div>
