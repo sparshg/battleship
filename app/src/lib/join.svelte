@@ -7,11 +7,13 @@
 		class: className = '',
 		roomCode,
 		createRoom,
-		joinRoom
+		joinRoom,
+		leaveRoom
 	}: {
 		roomCode: string;
 		createRoom: () => void;
 		joinRoom: (code: string) => void;
+		leaveRoom: () => void;
 		class: string;
 	} = $props();
 </script>
@@ -41,8 +43,8 @@
 				Create Room
 			</button>
 		{/if}
+		<div class="text-center text-lg text-primary-content">OR</div>
 		{#if !roomCode}
-			<div class="text-center text-lg text-primary-content">OR</div>
 			<div class="space-y-2">
 				<input
 					type="text"
@@ -56,6 +58,12 @@
 					class="w-full btn btn-outline btn-neutral text-neutral hover:border-neutral hover:bg-transparent text-xl"
 				>
 					Join Room
+				</button>
+			</div>
+		{:else}
+			<div class="space-x-2 flex flex-row justify-center items-center">
+				<button class="btn btn-error text-2xl" onclick={leaveRoom}>
+					Leave room
 				</button>
 			</div>
 		{/if}
