@@ -23,7 +23,7 @@
 >
 	<div class="space-y-4 max-w-[70%]">
 		{#if roomCode}
-		<div class="text-center text-lg text-primary-content">Share this room code</div>
+			<div class="text-center text-lg text-primary-content">Share this room code</div>
 			<div class="space-x-2 flex flex-row justify-center items-center">
 				<div
 					class="text-3xl font-bold tracking-widest text-secondary-content font-mono bg-secondary py-3 rounded-full px-12"
@@ -62,7 +62,10 @@
 			</div>
 		{:else}
 			<div class="space-x-2 flex flex-row justify-center items-center">
-				<button class="btn btn-error text-2xl px-12 py-3 h-fit" onclick={leaveRoom}>
+				<button
+					class="w-full btn btn-outline btn-neutral text-neutral hover:border-neutral hover:bg-transparent text-xl"
+					onclick={leaveRoom}
+				>
 					Leave room
 				</button>
 			</div>
