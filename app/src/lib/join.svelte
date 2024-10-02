@@ -62,7 +62,7 @@
 			</div>
 		{:else}
 			<div class="space-x-2 flex flex-row justify-center items-center">
-				<button class="btn btn-error text-2xl" onclick={leaveRoom}>
+				<button class="btn btn-error text-2xl px-12 py-3 h-fit" onclick={leaveRoom}>
 					Leave room
 				</button>
 			</div>
