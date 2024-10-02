@@ -12,7 +12,7 @@ The client is built using SvelteKit (static site) and the server uses Axum frame
 
 The client can be started using `npm run dev` inside `app` directory.
 
-The server and the database services are containarized. Just run `docker compose up` to start the server and database services if you are working on the frontend.
+The server and the database services are containerized. Just run `docker compose up` to start the server and database services if you are working on the frontend.
 Make sure to make a `.env` file with these parameters:
 ```
 DATABASE_PASSWORD=db_password
