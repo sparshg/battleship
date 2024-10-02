@@ -23,7 +23,7 @@
 >
 	<div class="space-y-4 max-w-[70%]">
 		{#if roomCode}
-		<div class="text-center text-lg text-primary-content">Share this code with your opponent to play</div>
+		<div class="text-center text-lg text-primary-content">Share this room code</div>
 			<div class="space-x-2 flex flex-row justify-center items-center">
 				<div
 					class="text-3xl font-bold tracking-widest text-secondary-content font-mono bg-secondary py-3 rounded-full px-12"
