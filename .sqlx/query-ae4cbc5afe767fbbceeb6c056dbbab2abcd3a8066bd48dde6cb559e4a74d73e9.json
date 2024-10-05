@@ -13,7 +13,8 @@
               "Enum": [
                 "waiting",
                 "p1turn",
-                "p2turn"
+                "p2turn",
+                "gameover"
               ]
             }
           }
