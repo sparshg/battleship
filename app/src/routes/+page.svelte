@@ -43,10 +43,7 @@
 								<div class="font-mono font-bold">{gameState.users}</div>
 								<Users />
 							</div>
-							<button
-								class="btn btn-error text-xl"
-								onclick={leaveRoom}>Leave</button
-							>
+							<button class="btn btn-error text-xl" onclick={leaveRoom}>Leave</button>
 						</div>
 					{/if}
 				</div>
@@ -69,13 +66,37 @@
 								board={gameState.opponentBoard}
 								callback={(i, j) => gameState.attack(i, j)}
 							/>
+
+							{#if gameState.game_over}
+								<div
+									class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 pointer-events-none"
+								>
+									<div class="p-6 bg-base-300 rounded-xl text-center">
+										<h3 class="text-2xl font-semibold">Game Over</h3>
+										<p class="text-lg">
+											{gameState.turn >= 0 ? 'You win!' : 'You lose!'}
+										</p>
+										<button
+											class="btn btn-primary mt-4 pointer-events-auto"
+											onclick={() => {
+												let room = gameState.room;
+												leaveRoom();
+												gameState.joinRoom(room);
+											}}
+										>
+											Play Again
+										</button>
+										<button class="btn btn-secondary mt-4 ml-4 pointer-events-auto" onclick={leaveRoom}>Leave</button>
+									</div>
+								</div>
+							{/if}
 							{#if gameState.hasNotStarted()}
 								<Join
 									class="absolute top-[24px] left-[15px] w-[calc(100%-15px)] h-[calc(100%-24px)]"
 									roomCode={gameState.room}
 									createRoom={() => gameState.createRoom()}
 									joinRoom={(code) => gameState.joinRoom(code)}
-									leaveRoom={leaveRoom}
+									{leaveRoom}
 								/>
 							{/if}
 						</div>

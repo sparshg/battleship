@@ -60,7 +60,7 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
             socket
                 .emit(
                     "restore",
-                    serde_json::json!({"turn": data.0, "player": data.1, "opponent": data.2}),
+                    serde_json::json!({"turn": data.0, "player": data.1, "opponent": data.2, "game_over": data.3}),
                 )
                 .unwrap();
             socket.join(room.clone()).unwrap();
@@ -170,7 +170,7 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
     socket.on(
         "attack",
         |socket: SocketRef, Data::<[usize; 2]>([i, j]), pool: State<PgPool>| async move {
-            let (hit, sunk) = match attack(socket.id, (i, j), &pool).await {
+            let (hit, sunk, game_over) = match attack(socket.id, (i, j), &pool).await {
                 Ok(res) => res,
                 Err(e) => {
                     tracing::error!("{:?}", e);
@@ -182,7 +182,7 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
                 .within(socket.rooms().unwrap().first().unwrap().clone())
                 .emit(
                     "attacked",
-                    serde_json::json!({"by": socket.id.as_str(), "at": [i, j], "hit": hit, "sunk": sunk}),
+                    serde_json::json!({"by": socket.id.as_str(), "at": [i, j], "hit": hit, "sunk": sunk, "game_over": game_over}),
                 )
                 .unwrap();
         },
