@@ -94,9 +94,7 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
     if [room.player1_id.as_ref(), room.player2_id.as_ref()]
         .into_iter()
         .flatten()
-        .filter(|&x| x == sid)
-        .next()
-        .is_some()
+        .any(|x| x == sid)
     {
         // if game was over, set status to waiting and return
         if room.stat == Status::GameOver {
@@ -335,9 +333,13 @@ pub async fn attack(
         .execute(&mut *txn)
         .await?;
     }
-    
+
     txn.commit().await?;
-    Ok((hit, if hit { board.has_sunk((i, j)) } else { None }, game_over))
+    Ok((
+        hit,
+        if hit { board.has_sunk((i, j)) } else { None },
+        game_over,
+    ))
 }
 
 pub async fn update_sid(oldsid: &str, newsid: &str, pool: &sqlx::PgPool) -> Result<()> {
