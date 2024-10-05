@@ -67,7 +67,7 @@
 								callback={(i, j) => gameState.attack(i, j)}
 							/>
 
-							{#if gameState.game_over}
+							{#if gameState.phase === 'gameover'}
 								<div
 									class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 pointer-events-none"
 								>
@@ -78,11 +78,7 @@
 										</p>
 										<button
 											class="btn btn-primary mt-4 pointer-events-auto"
-											onclick={() => {
-												let room = gameState.room;
-												leaveRoom();
-												gameState.joinRoom(room);
-											}}
+											onclick={() => gameState.playAgain()}
 										>
 											Play Again
 										</button>

@@ -10,10 +10,7 @@ export class State {
     users = $state(0);
     room = $state('');
     turn = $state(-1); // -1 not my turn, 0 might be, 1 is
-    game_over = $state(false);
     socket: Socket;
-
-    play_again_phase = $state(false);
 
     constructor() {
         const url = import.meta.env.DEV ? 'ws://localhost:3000' : 'wss://battleship.icyground-d91964e0.centralindia.azurecontainerapps.io';
@@ -32,8 +29,12 @@ export class State {
             this.room = room;
             this.users = users;
         });
-
         this.socket.on('upload', (_, callback) => {
+            if (this.phase == 'gameover') {
+                this.playerBoard.randomize();
+                this.opponentBoard = new Board(true);
+                this.phase = 'waiting';
+            }
             callback(this.playerBoard.board);
         });
         this.socket.on('turnover', (id) => {
@@ -73,18 +74,19 @@ export class State {
                     }
                 }
             }
-            
-            this.game_over = game_over;
-
+            if (game_over) {
+                this.phase = 'gameover';
+            }
         });
 
-        this.socket.on('restore', ({ turn, player, opponent, game_over }: { turn: boolean, player: string[], opponent: string[], game_over: boolean }) => {
+        this.socket.on('restore', ({ turn, player, opponent, gameover }: { turn: boolean, player: string[], opponent: string[], gameover: boolean }) => {
             this.turn = turn ? 1 : -1;
             this.phase = this.turn ? 'selfturn' : 'otherturn';
             this.playerBoard.board = player.map((s) => s.split('').map(c => c as CellType));
             this.opponentBoard.board = opponent.map((s) => s.split('').map(c => c as CellType));
-
-            this.game_over = game_over;
+            if (gameover) {
+                this.phase = 'gameover';
+            }
         })
     }
 
@@ -102,12 +104,16 @@ export class State {
 
     joinRoom(code: string) {
         code = code.toUpperCase();
-        if (code.length != 4 || code == this.room) return;
+        if (code.length != 4 || code == this.room && this.phase !== 'gameover') return;
         this.socket.emit('join', code);
     }
 
     hasNotStarted() {
         return this.phase == 'placement' || this.phase == 'waiting';
+    }
+
+    playAgain() {
+        this.joinRoom(this.room);
     }
 }
 

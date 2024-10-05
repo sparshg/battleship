@@ -60,7 +60,7 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
             socket
                 .emit(
                     "restore",
-                    serde_json::json!({"turn": data.0, "player": data.1, "opponent": data.2, "game_over": data.3}),
+                    serde_json::json!({"turn": data.0, "player": data.1, "opponent": data.2, "gameover": data.3}),
                 )
                 .unwrap();
             socket.join(room.clone()).unwrap();
@@ -118,7 +118,7 @@ async fn on_connect(socket: SocketRef, Data(auth): Data<AuthPayload>, pool: Stat
                     socket
                         .emit(
                             "restore",
-                            serde_json::json!({"turn": data.0, "player": data.1, "opponent": data.2}),
+                            serde_json::json!({"turn": data.0, "player": data.1, "opponent": data.2, "gameover": data.3}),
                         )
                         .unwrap();
                 } else {

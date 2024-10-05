@@ -15,6 +15,8 @@ pub enum Error {
     RoomFull(Option<String>),
     #[error("Room not full")]
     RoomNotFull,
+    #[error("GameOver room joined")]
+    GameOverRoom,
     #[error("Already in room")]
     AlreadyInRoom,
     #[error("Not in room")]
@@ -33,7 +35,7 @@ pub enum Status {
     Waiting,
     P1Turn,
     P2Turn,
-    GameOver
+    GameOver,
 }
 
 pub async fn room_if_player_exists(sid: &str, pool: &sqlx::PgPool) -> Result<Option<String>> {
@@ -80,7 +82,7 @@ pub async fn add_room(sid: Sid, pool: &sqlx::PgPool) -> Result<String> {
 pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
     let code = code.to_uppercase();
     let room = sqlx::query!(
-        r#"SELECT player1_id, player2_id FROM rooms WHERE code = $1"#,
+        r#"SELECT player1_id, player2_id, stat AS "stat: Status" FROM rooms WHERE code = $1"#,
         code
     )
     .fetch_one(pool)
@@ -88,25 +90,41 @@ pub async fn join_room(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()
 
     let sid = sid.as_str();
 
+    // if player is already in room
+    if [room.player1_id.as_ref(), room.player2_id.as_ref()]
+        .into_iter()
+        .flatten()
+        .filter(|&x| x == sid)
+        .next()
+        .is_some()
+    {
+        // if game was over, set status to waiting and return
+        if room.stat == Status::GameOver {
+            sqlx::query!(
+                r"UPDATE rooms SET stat = $1 WHERE code = $2",
+                Status::Waiting as Status,
+                code
+            )
+            .execute(pool)
+            .await?;
+            return Ok(());
+        }
+        return Err(Error::AlreadyInRoom);
+    }
+
+    if room.stat == Status::GameOver {
+        return Err(Error::GameOverRoom);
+    }
+
     if let (Some(p1), Some(p2)) = (room.player1_id.as_ref(), room.player2_id.as_ref()) {
         if in_delete_sid(p1, pool).await? {
-            update_sid(p1, sid, pool).await?;
+            // update_sid(p1, sid, pool).await?;
             return Err(Error::RoomFull(Some(p1.to_string())));
         } else if in_delete_sid(p2, pool).await? {
-            update_sid(p2, sid, pool).await?;
+            // update_sid(p2, sid, pool).await?;
             return Err(Error::RoomFull(Some(p2.to_string())));
         }
         return Err(Error::RoomFull(None));
-    }
-    if let Some(id) = room.player1_id.as_ref() {
-        if id == sid {
-            return Err(Error::AlreadyInRoom);
-        }
-    }
-    if let Some(id) = room.player2_id.as_ref() {
-        if id == sid {
-            return Err(Error::AlreadyInRoom);
-        }
     }
     delete_sid(sid, pool).await?;
     let mut txn = pool.begin().await?;
