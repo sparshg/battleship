@@ -134,6 +134,11 @@ impl Board {
         self
     }
 
+    pub fn is_game_over(&self) -> bool {
+        self.iter()
+            .all(|row| row.iter().all(|cell| matches!(cell, 'e' | 'm' | 'h')))
+    }
+
     // fn validate_syntax(&self) -> bool {
     //     self
     //         .iter()

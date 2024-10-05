@@ -33,6 +33,7 @@ pub enum Status {
     Waiting,
     P1Turn,
     P2Turn,
+    GameOver
 }
 
 pub async fn room_if_player_exists(sid: &str, pool: &sqlx::PgPool) -> Result<Option<String>> {
@@ -158,7 +159,7 @@ pub async fn get_game_state(
     sid: &str,
     room: &str,
     pool: &sqlx::PgPool,
-) -> Result<(bool, Vec<String>, Vec<String>)> {
+) -> Result<(bool, Vec<String>, Vec<String>, bool)> {
     let room_details = sqlx::query!(
         r#"SELECT player1_id, player2_id, stat AS "stat: Status" FROM rooms WHERE code = $1"#,
         room
@@ -188,7 +189,6 @@ pub async fn get_game_state(
     .board
     .unwrap()
     .into();
-    let player_board: Vec<String> = player_board.mark_redundant().into();
 
     let opponent_board: Board = sqlx::query!(
         r#"SELECT board FROM players WHERE id = $1 AND room_code = $2"#,
@@ -200,6 +200,11 @@ pub async fn get_game_state(
     .board
     .unwrap()
     .into();
+
+    let game_over = player_board.is_game_over() || opponent_board.is_game_over();
+
+    let player_board: Vec<String> = player_board.mark_redundant().into();
+
     let opponent_board: Vec<String> = opponent_board.mark_redundant().into();
     let opponent_board: Vec<String> = opponent_board
         .into_iter()
@@ -210,7 +215,7 @@ pub async fn get_game_state(
         })
         .collect::<Vec<_>>();
 
-    Ok((turn, player_board, opponent_board))
+    Ok((turn, player_board, opponent_board, game_over))
 }
 
 pub async fn start(sid: Sid, code: String, pool: &sqlx::PgPool) -> Result<()> {
@@ -247,7 +252,7 @@ pub async fn attack(
     sid: Sid,
     (i, j): (usize, usize),
     pool: &sqlx::PgPool,
-) -> Result<(bool, Option<[(usize, usize); 2]>)> {
+) -> Result<(bool, Option<[(usize, usize); 2]>, bool)> {
     let player = sqlx::query!(r"SELECT room_code FROM players WHERE id = $1", sid.as_str())
         .fetch_one(pool)
         .await?;
@@ -302,9 +307,19 @@ pub async fn attack(
         .execute(&mut *txn)
         .await?;
     }
-
+    let game_over = board.is_game_over();
+    if game_over {
+        sqlx::query!(
+            r#"UPDATE rooms SET stat = $1 WHERE code = $2"#,
+            Status::GameOver as Status,
+            player.room_code
+        )
+        .execute(&mut *txn)
+        .await?;
+    }
+    
     txn.commit().await?;
-    Ok((hit, if hit { board.has_sunk((i, j)) } else { None }))
+    Ok((hit, if hit { board.has_sunk((i, j)) } else { None }, game_over))
 }
 
 pub async fn update_sid(oldsid: &str, newsid: &str, pool: &sqlx::PgPool) -> Result<()> {

@@ -1,5 +1,5 @@
 -- DROP OWNED BY CURRENT_USER CASCADE;
-CREATE TYPE STAT AS ENUM ('waiting', 'p1turn', 'p2turn');
+CREATE TYPE STAT AS ENUM ('waiting', 'p1turn', 'p2turn', 'gameover');
 
 CREATE TABLE IF NOT EXISTS players (
     id CHAR(16) PRIMARY KEY,

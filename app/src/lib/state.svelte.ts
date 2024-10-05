@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 
-export type Phase = 'placement' | 'waiting' | 'selfturn' | 'otherturn';
+export type Phase = 'placement' | 'waiting' | 'selfturn' | 'otherturn' | 'gameover';
 export type CellType = 'e' | 's' | 'h' | 'm'; // empty, ship, hit, miss
 
 export class State {
@@ -10,7 +10,10 @@ export class State {
     users = $state(0);
     room = $state('');
     turn = $state(-1); // -1 not my turn, 0 might be, 1 is
+    game_over = $state(false);
     socket: Socket;
+
+    play_again_phase = $state(false);
 
     constructor() {
         const url = import.meta.env.DEV ? 'ws://localhost:3000' : 'wss://battleship.icyground-d91964e0.centralindia.azurecontainerapps.io';
@@ -37,7 +40,7 @@ export class State {
             this.turn = (id == this.socket.id) ? 1 : -1;
             this.phase = this.turn ? 'selfturn' : 'otherturn';
         });
-        this.socket.on('attacked', ({ by, at, hit, sunk }) => {
+        this.socket.on('attacked', ({ by, at, hit, sunk, game_over }) => {
             const [i, j]: [number, number] = at;
             const board = by == this.socket.id ? this.opponentBoard : this.playerBoard;
             if (by == this.socket.id) {
@@ -70,13 +73,18 @@ export class State {
                     }
                 }
             }
+            
+            this.game_over = game_over;
+
         });
 
-        this.socket.on('restore', ({ turn, player, opponent }: { turn: boolean, player: string[], opponent: string[] }) => {
+        this.socket.on('restore', ({ turn, player, opponent, game_over }: { turn: boolean, player: string[], opponent: string[], game_over: boolean }) => {
             this.turn = turn ? 1 : -1;
             this.phase = this.turn ? 'selfturn' : 'otherturn';
             this.playerBoard.board = player.map((s) => s.split('').map(c => c as CellType));
             this.opponentBoard.board = opponent.map((s) => s.split('').map(c => c as CellType));
+
+            this.game_over = game_over;
         })
     }
 
